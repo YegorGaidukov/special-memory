@@ -2,57 +2,21 @@
 
 import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect } from "react";
-import { DropInViewer } from "@mkkellogg/gaussian-splats-3d";
-import { MEMORIES_BASE_URL } from "@/config/explorer";
-import { resolveAssetUrl } from "@/lib/manifest/url";
-import { toSplatSceneArgs } from "@/lib/transform/apply";
 import { useManifest } from "@/hooks/useManifest";
 import FreeFly from "@/components/FreeFly";
+import Memories from "@/components/Memories";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
 // Stable empty list so FreeFly's effects don't re-bind before the manifest loads.
 const EMPTY: MemoryRecord[] = [];
 
-// Step 5: load every memory from the manifest at its stored transform. One
-// DropInViewer holds all scenes (Step 8 will make this load/dispose on approach).
-function SplatScenes({ records }: { records: MemoryRecord[] }) {
-  const scene = useThree((s) => s.scene);
+function ContextLossLogger() {
   const gl = useThree((s) => s.gl);
-
   useEffect(() => {
     const onLost = () => console.warn("[explorer] WebGL context lost");
     gl.domElement.addEventListener("webglcontextlost", onLost);
     return () => gl.domElement.removeEventListener("webglcontextlost", onLost);
   }, [gl]);
-
-  useEffect(() => {
-    const viewer = new DropInViewer({ sharedMemoryForWorkers: true });
-    scene.add(viewer);
-
-    const sceneOptions = records.map((r) => {
-      const { position, rotation, scale } = toSplatSceneArgs(r);
-      return {
-        path: resolveAssetUrl(MEMORIES_BASE_URL, r.splat_url),
-        position,
-        rotation,
-        scale,
-      };
-    });
-
-    const loader = viewer.addSplatScenes(sceneOptions, false);
-    Promise.resolve(loader).catch((err) => {
-      const e = err as { aborted?: boolean; name?: string };
-      if (e?.aborted || e?.name === "AbortError") return; // unmount race
-      console.error("[explorer] failed to load splat scenes", err);
-    });
-
-    return () => {
-      (loader as { abort?: () => void }).abort?.();
-      scene.remove(viewer);
-      viewer.dispose().catch(() => {});
-    };
-  }, [scene, records]);
-
   return null;
 }
 
@@ -102,7 +66,8 @@ export default function SplatWorld() {
         camera={{ position: [0, 12, 70], fov: 60, near: 0.1, far: 3000 }}
       >
         <color attach="background" args={["#05060a"]} />
-        {m.status === "ready" && <SplatScenes records={m.manifest.memories} />}
+        <ContextLossLogger />
+        {m.status === "ready" && <Memories records={m.manifest.memories} />}
         <FreeFly records={m.status === "ready" ? m.manifest.memories : EMPTY} speed={25} />
       </Canvas>
       <Crosshair />

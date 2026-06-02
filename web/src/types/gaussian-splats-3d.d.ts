@@ -36,9 +36,17 @@ declare module "@mkkellogg/gaussian-splats-3d" {
     [key: string]: unknown;
   }
 
+  export class Viewer {
+    constructor(options?: ViewerOptions);
+    /** True while an add or remove is in progress; a new add/remove throws. */
+    isLoadingOrUnloading(): boolean;
+  }
+
   /** A Viewer wrapped as a THREE.Group so it drops into an existing scene. */
   export class DropInViewer extends THREE.Group {
     constructor(options?: ViewerOptions);
+    /** The wrapped Viewer (used to read isLoadingOrUnloading). */
+    viewer: Viewer;
     addSplatScene(path: string, options?: SplatSceneOptions): Promise<void>;
     addSplatScenes(
       sceneOptions: SplatSceneOptions[],
@@ -49,10 +57,6 @@ declare module "@mkkellogg/gaussian-splats-3d" {
     getSceneCount(): number;
     getSplatScene(index: number): unknown;
     dispose(): Promise<void>;
-  }
-
-  export class Viewer {
-    constructor(options?: ViewerOptions);
   }
 
   export const SceneFormat: {
