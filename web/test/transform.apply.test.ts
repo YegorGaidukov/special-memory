@@ -32,8 +32,17 @@ describe("toSplatSceneArgs", () => {
     expect(toSplatSceneArgs(record()).position).toEqual([1, 2, 3]);
   });
 
-  it("maps the stored quaternion to the renderer's rotation arg", () => {
-    expect(toSplatSceneArgs(record()).rotation).toEqual([0, 0.7071, 0, 0.7071]);
+  it("applies the SHARP->three.js (180° about X) correction to an identity orientation", () => {
+    expect(toSplatSceneArgs(record({ quaternion: [0, 0, 0, 1] })).rotation).toEqual([
+      1, 0, 0, 0,
+    ]);
+  });
+
+  it("composes the memory orientation with the correction (memory ∘ correction)", () => {
+    // 180° about Y composed with the 180°-about-X correction = 180° about Z.
+    expect(toSplatSceneArgs(record({ quaternion: [0, 1, 0, 0] })).rotation).toEqual([
+      0, 0, -1, 0,
+    ]);
   });
 
   it("normalizes scale to a 3-vector", () => {

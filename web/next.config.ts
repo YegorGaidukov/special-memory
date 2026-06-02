@@ -12,6 +12,12 @@ const crossOriginIsolationHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // The explorer is a single, full-page WebGL canvas. React StrictMode's dev-only
+  // double-mount tears down and recreates the splat Viewer (aborting an in-flight
+  // load and racing GPU teardown against the live instance), which manifests as a
+  // lost WebGL context. Production never double-mounts, so turning StrictMode off
+  // makes dev behave like prod for this canvas. (Diagnostic isolation step.)
+  reactStrictMode: false,
   async headers() {
     return [
       {
