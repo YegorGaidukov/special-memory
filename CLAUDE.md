@@ -13,11 +13,14 @@ collective memory — dense where remembered, dreamlike at the edges.
 **Source of truth (read these first):**
 - Design/spec: `docs/superpowers/specs/2026-06-02-collective-memory-city-design.md`
 - S1 implementation plan: `docs/superpowers/plans/2026-06-02-s1-reconstruction-pipeline.md`
+- S2 explorer docs: `web/README.md` (setup, run, controls, architecture, deferrals)
 
-**Current state:** **S1 is built, unit-tested, and validated end-to-end on the laptop GPU** —
-the `pipeline/` package + `tests/` exist and pass; see `samples/README.md` for the real-run
-smoke-test metrics and findings. **S2 and S3 are not started and have no plans yet.** Build order
-is **S1 → S2 → S3** (below); each subsystem gets its own plan under `docs/superpowers/plans/`.
+**Current state:** **S1 (Python pipeline) and S2 (web explorer) are both built and unit-tested.**
+S1 is validated end-to-end on the laptop GPU (`pipeline/` + `tests/`; see `samples/README.md`).
+S2 lives in `web/` (Next.js + R3F + SHARP splats; 48 Vitest specs); it renders the dark void,
+loads the seed memories upright, and supports free-fly + click-to-travel — **verify on a
+production build** (`npm run build && npm run start`), not dev (HMR remounts the WebGL viewer and
+throws spurious errors). **S3 is not started.** Build order is **S1 → S2 → S3** (below).
 
 ## Architecture (big picture)
 
@@ -33,9 +36,17 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   thumbnail + `manifest.json`. The heavy GPU call is isolated behind a single seam
   (`pipeline/sharp_runner.run_sharp`) so all other logic is unit-tested without a GPU. Confirmed:
   SHARP writes `<stem>.ply` matching the input filename, so the manifest matches outputs by stem.
-- **S2 — Explorer (web).** Next.js + Three.js + `@mkkellogg/gaussian-splats-3d`. Renders the
-  dark-void world and loads memory splats from the manifest by their stored transform. Free-fly +
-  click-a-memory-to-travel; light LOD (load on approach, photo billboard when far).
+- **S2 — Explorer (web). [BUILT]** A `web/` Next.js (App Router) app: React Three Fiber +
+  `@mkkellogg/gaussian-splats-3d`. Renders the dark void and places each memory's splat at its
+  stored `transform` (upright, via a SHARP→three.js 180°-about-X frame correction in
+  `lib/transform/apply.ts`). FPS free-fly (pointer-lock look + WASD-where-you-look) +
+  click-a-memory-to-travel. **Pure logic** (`src/lib/{manifest,transform,camera,lod}`) is
+  unit-tested; the WebGL Viewer is the single mocked seam, proven by a manual smoke test.
+  **S2 does no geo math** — it only reads stored transforms. Until S3 exists it runs on a
+  hand-authored `web/public/memories/manifest.json`. **Deferred for now:** auto-LOD
+  (load/dispose-on-approach + photo billboards — the library's dynamic add/remove races its async
+  splat-tree build, a null `visitLeaves` crash; tested decision logic kept in `src/lib/lod/`) and
+  the starfield/grid; all splats currently batch-load.
 - **S3 — Contribution (web).** Upload form → EXIF parse → MapLibre map pin + facing-arrow placement
   → enqueue to S1 → approve flag → memory appears in the explorer.
 
@@ -97,14 +108,33 @@ sharp predict -i <input_image_dir> -o <output_dir>
 
 The first SHARP run auto-downloads a **~2.6 GB** checkpoint to `~/.cache/torch/hub/checkpoints/`.
 
+**S2 explorer** lives in `web/` (Node 22+, no conda/GPU env). Seed its assets from S1 output first
+(git-ignored): `cp samples/output/splats/*.ply samples/output/thumbs/*.jpg web/public/memories/`.
+
+```powershell
+cd web
+npm install
+npm run dev          # dev server (http://localhost:3000) — for iteration only
+npm run build        # production build
+npm run start        # serve the production build — VERIFY HERE, not dev
+npm test             # Vitest unit tests (pure logic; WebGL Viewer is the mocked seam)
+```
+
 ## Conventions
 
-- **TDD, with the GPU isolated.** Test the logic we write (command construction, thumbnails,
-  manifest, orchestration) with the SHARP subprocess mocked/injected; prove the real model with one
-  manual integration smoke test, not a unit test.
+- **TDD, with the un-testable seam isolated.** S1: test the logic we write (command construction,
+  thumbnails, manifest, orchestration) with the SHARP subprocess mocked/injected; prove the real
+  model with one manual smoke test. S2 mirrors this — pure logic in `web/src/lib/**` is
+  Vitest-tested; the WebGL Viewer is the single mocked seam, proven by the manual browser smoke
+  test. Don't unit-test the GPU/WebGL.
+- **S2 gotchas:** React StrictMode is **disabled** (`web/next.config.ts`) — its dev double-mount
+  tore down the splat viewer's WebGL context. The renderer's worker sort needs **COOP/COEP**
+  headers (set in `next.config.ts`) for SharedArrayBuffer. `@mkkellogg/gaussian-splats-3d` ships no
+  types — see the hand-written decl in `web/src/types/`.
 - Small, single-responsibility modules in `pipeline/` (`thumbnails`, `sharp_runner`, `manifest`,
   `cli`). Files that change together live together.
 - This project follows the **superpowers** workflow: specs live in `docs/superpowers/specs/`, plans
   in `docs/superpowers/plans/`. Brainstorm → spec → plan → implement; commit frequently.
 - Splat/binary outputs (`*.ply`, `*.ksplat`, `outputs/`, `samples/`) are git-ignored — keep them
-  local.
+  local. In `web/`, `node_modules/`, `.next/`, and the seed binaries under `public/memories/`
+  (`*.ply`/`*.jpg`) are ignored; `manifest.json` + READMEs there are tracked.
