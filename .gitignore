@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+outputs/
+samples/
+.pytest_cache/
+.venv/
+*.ply
+*.ksplat
