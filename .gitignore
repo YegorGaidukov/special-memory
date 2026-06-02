@@ -1,7 +1,8 @@
 __pycache__/
 *.pyc
 outputs/
-samples/
+samples/*
+!samples/README.md
 .pytest_cache/
 .venv/
 *.ply
