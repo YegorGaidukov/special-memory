@@ -14,21 +14,25 @@ collective memory — dense where remembered, dreamlike at the edges.
 - Design/spec: `docs/superpowers/specs/2026-06-02-collective-memory-city-design.md`
 - S1 implementation plan: `docs/superpowers/plans/2026-06-02-s1-reconstruction-pipeline.md`
 
-**Current state:** pre-implementation. Only the spec and plan docs exist; no application code yet.
-Build order is **S1 → S2 → S3** (below). Each subsystem gets its own plan under
-`docs/superpowers/plans/`.
+**Current state:** **S1 is built, unit-tested, and validated end-to-end on the laptop GPU** —
+the `pipeline/` package + `tests/` exist and pass; see `samples/README.md` for the real-run
+smoke-test metrics and findings. **S2 and S3 are not started and have no plans yet.** Build order
+is **S1 → S2 → S3** (below); each subsystem gets its own plan under `docs/superpowers/plans/`.
 
 ## Architecture (big picture)
 
 The reconstruction keystone is **Apple SHARP** (`github.com/apple/ml-sharp`): a feedforward model
-that turns a **single image** into a **metric-scaled** 3D Gaussian splat (`.ply`) in ~1s on a CUDA
-GPU, with no per-scene training. Metric scale is what lets each memory drop into one shared
+that turns a **single image** into a **metric-scaled** 3D Gaussian splat (`.ply`) in ~1s on a
+high-end CUDA GPU (measured **~8s/image on the RTX 4060 laptop**; ~1.18M Gaussians, ~63 MB/splat),
+with no per-scene training. Metric scale is what lets each memory drop into one shared
 real-world coordinate space. The system is three loosely-coupled subsystems linked by a JSON
 **manifest** of memory records:
 
-- **S1 — Reconstruction (Python).** A `pipeline/` package wrapping the `sharp predict` CLI. Input
-  image(s) → `.ply` splat + thumbnail + `manifest.json`. The heavy GPU call is isolated behind a
-  single seam (`pipeline/sharp_runner.run_sharp`) so all other logic is unit-tested without a GPU.
+- **S1 — Reconstruction (Python). [BUILT]** A `pipeline/` package wrapping the `sharp predict` CLI
+  (modules: `thumbnails`, `sharp_runner`, `manifest`, `cli`). Input image(s) → `.ply` splat +
+  thumbnail + `manifest.json`. The heavy GPU call is isolated behind a single seam
+  (`pipeline/sharp_runner.run_sharp`) so all other logic is unit-tested without a GPU. Confirmed:
+  SHARP writes `<stem>.ply` matching the input filename, so the manifest matches outputs by stem.
 - **S2 — Explorer (web).** Next.js + Three.js + `@mkkellogg/gaussian-splats-3d`. Renders the
   dark-void world and loads memory splats from the manifest by their stored transform. Free-fly +
   click-a-memory-to-travel; light LOD (load on approach, photo billboard when far).
@@ -52,6 +56,11 @@ city origin; user-set heading → yaw; SHARP's metric scale → real size.
 - SHARP **auto-detects** its device (CUDA when available). This already satisfies the
   laptop↔server portability goal; don't add a device flag unless forcing CPU/MPS, via the
   `--sharp-arg` passthrough.
+- **Model license is research/non-commercial only** (`ml-sharp/LICENSE_MODEL`) — fine for this
+  non-commercial university exhibition; no commercial product/service use of the weights.
+- SHARP reads **focal length from EXIF** to set metric scale; absent it, it defaults to 30 mm and
+  warns. Messaging-app exports (Telegram/WhatsApp) strip EXIF (no focal length, no GPS) — prefer
+  originals, or set/normalize focal length, for correct metric scale.
 - **Compute split:** all dev/prototyping runs on a Windows + NVIDIA-GPU laptop; the 96 GB-VRAM
   Windows server is for the **exhibition only**. Keep the pipeline runnable on both unchanged.
 - **YAGNI for the MVP** — explicitly deferred: thousands-scale streaming/clustering, crowd
@@ -59,29 +68,34 @@ city origin; user-set heading → yaw; SHARP's metric scale → real size.
 
 ## Commands
 
-SHARP and the S1 pipeline share one conda env (Python 3.13). SHARP is checked out separately
-(e.g. `C:\Work\GitHub\ml-sharp`).
+SHARP and the S1 pipeline share one **Miniconda** env, `sharp` (Python 3.13), at
+`C:\Users\egayd\miniconda3\envs\sharp` on the dev laptop. SHARP is checked out at
+`C:\Work\GitHub\ml-sharp`. **Unit tests run in a separate `.venv` (Python 3.12) at the repo root** —
+the pipeline code is SHARP-independent (GPU mocked behind `sharp_runner.run_sharp`), so no
+conda/GPU is needed for them.
 
 ```powershell
-# One-time env + SHARP install
+# One-time env + SHARP install (already done on the dev laptop)
 conda create -n sharp python=3.13 -y
 conda activate sharp
-pip install -r C:\Work\GitHub\ml-sharp\requirements.txt   # SHARP deps
+pip install -r C:\Work\GitHub\ml-sharp\requirements.txt   # SHARP (incl. `-e .` → the `sharp` CLI)
 pip install -r requirements-pipeline.txt                  # our deps (pillow, pytest)
+# PyPI torch is CPU-only on Windows — install the CUDA build for GPU:
+pip install --index-url https://download.pytorch.org/whl/cu128 --force-reinstall torch==2.8.0 torchvision==0.23.0
 
-# Run the reconstruction pipeline (once pipeline/ exists)
+# Run the reconstruction pipeline (needs `sharp` on PATH → activate the env first)
+conda activate sharp
 python -m pipeline -i samples\input -o samples\output
 
 # Run SHARP directly
 sharp predict -i <input_image_dir> -o <output_dir>
 
-# Tests
-pytest                                  # full suite
-pytest tests/test_thumbnails.py -v      # one file
-pytest tests/test_cli.py::test_reconstruct_end_to_end_with_fake_runner -v   # one test
+# Tests (no GPU/conda — use the .venv)
+.\.venv\Scripts\python.exe -m pytest                              # full suite
+.\.venv\Scripts\python.exe -m pytest tests/test_thumbnails.py -v  # one file
 ```
 
-The first SHARP run auto-downloads a ~1.2 GB checkpoint to `~/.cache/torch/hub/checkpoints/`.
+The first SHARP run auto-downloads a **~2.6 GB** checkpoint to `~/.cache/torch/hub/checkpoints/`.
 
 ## Conventions
 
