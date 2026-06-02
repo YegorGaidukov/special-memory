@@ -16,4 +16,7 @@ export const LOD = {
 
 // Click-to-travel framing.
 export const FLY_TO_DURATION_MS = 1400;
-export const FLY_TO_STANDOFF = 10; // metres in front of a memory when arriving
+export const FLY_TO_STANDOFF = 12; // metres from a memory when arriving
+
+// "Look at it and click" selection: cone half-angle + max range.
+export const PICK = { maxAngleRad: 0.4, maxDist: 1000 } as const;

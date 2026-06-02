@@ -10,6 +10,9 @@ import { useManifest } from "@/hooks/useManifest";
 import FreeFly from "@/components/FreeFly";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
+// Stable empty list so FreeFly's effects don't re-bind before the manifest loads.
+const EMPTY: MemoryRecord[] = [];
+
 // Step 5: load every memory from the manifest at its stored transform. One
 // DropInViewer holds all scenes (Step 8 will make this load/dispose on approach).
 function SplatScenes({ records }: { records: MemoryRecord[] }) {
@@ -100,13 +103,13 @@ export default function SplatWorld() {
       >
         <color attach="background" args={["#05060a"]} />
         {m.status === "ready" && <SplatScenes records={m.manifest.memories} />}
-        <FreeFly speed={25} />
+        <FreeFly records={m.status === "ready" ? m.manifest.memories : EMPTY} speed={25} />
       </Canvas>
       <Crosshair />
       {m.status === "loading" && <Hud text="Loading memories…" />}
       {m.status === "error" && <Hud text={`Failed to load memories: ${m.error}`} />}
       {m.status === "ready" && (
-        <Hud text={`${m.manifest.memories.length} memories · click to look · WASD to fly where you look · Esc to release`} />
+        <Hud text={`${m.manifest.memories.length} memories · click to look · WASD to fly · aim + click a memory to travel · Esc to release`} />
       )}
     </>
   );
