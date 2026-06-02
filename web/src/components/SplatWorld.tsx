@@ -1,13 +1,13 @@
 "use client";
 
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
 import { useEffect } from "react";
 import { DropInViewer } from "@mkkellogg/gaussian-splats-3d";
 import { MEMORIES_BASE_URL } from "@/config/explorer";
 import { resolveAssetUrl } from "@/lib/manifest/url";
 import { toSplatSceneArgs } from "@/lib/transform/apply";
 import { useManifest } from "@/hooks/useManifest";
+import FreeFly from "@/components/FreeFly";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
 // Step 5: load every memory from the manifest at its stored transform. One
@@ -53,6 +53,25 @@ function SplatScenes({ records }: { records: MemoryRecord[] }) {
   return null;
 }
 
+function Crosshair() {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: "50%",
+        top: "50%",
+        width: 6,
+        height: 6,
+        marginLeft: -3,
+        marginTop: -3,
+        borderRadius: "50%",
+        background: "rgba(230,233,240,0.5)",
+        pointerEvents: "none",
+      }}
+    />
+  );
+}
+
 function Hud({ text }: { text: string }) {
   return (
     <div
@@ -81,12 +100,13 @@ export default function SplatWorld() {
       >
         <color attach="background" args={["#05060a"]} />
         {m.status === "ready" && <SplatScenes records={m.manifest.memories} />}
-        <OrbitControls makeDefault />
+        <FreeFly speed={25} />
       </Canvas>
+      <Crosshair />
       {m.status === "loading" && <Hud text="Loading memories…" />}
       {m.status === "error" && <Hud text={`Failed to load memories: ${m.error}`} />}
       {m.status === "ready" && (
-        <Hud text={`${m.manifest.memories.length} memories — drag to orbit, scroll to zoom`} />
+        <Hud text={`${m.manifest.memories.length} memories · click to look · WASD to fly where you look · Esc to release`} />
       )}
     </>
   );
