@@ -27,9 +27,11 @@ const MOVE: Record<string, "fwd" | "back" | "left" | "right"> = {
 export default function FreeFly({
   records,
   speed = 25,
+  onArrive,
 }: {
   records: MemoryRecord[];
   speed?: number;
+  onArrive?: (record: MemoryRecord) => void;
 }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
@@ -38,10 +40,13 @@ export default function FreeFly({
   // Active travel: an eased fly-to function + elapsed time, or null when free.
   const fly = useRef<((elapsedMs: number) => FlySample) | null>(null);
   const flyElapsed = useRef(0);
+  const flyTarget = useRef<MemoryRecord | null>(null);
 
-  // Keep the latest records in a ref so the click handler isn't re-bound often.
+  // Keep the latest records/callback in refs so the click handler isn't re-bound.
   const recordsRef = useRef(records);
   recordsRef.current = records;
+  const onArriveRef = useRef(onArrive);
+  onArriveRef.current = onArrive;
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -89,6 +94,7 @@ export default function FreeFly({
       const to = framePoseForRecord(hit, origin, FLY_TO_STANDOFF);
       fly.current = makeFlyTo(from, to, FLY_TO_DURATION_MS);
       flyElapsed.current = 0;
+      flyTarget.current = hit;
     };
 
     const canvas = gl.domElement;
@@ -103,7 +109,10 @@ export default function FreeFly({
       const s = fly.current(flyElapsed.current);
       camera.position.set(s.position[0], s.position[1], s.position[2]);
       camera.lookAt(s.lookAt[0], s.lookAt[1], s.lookAt[2]);
-      if (s.done) fly.current = null;
+      if (s.done) {
+        fly.current = null;
+        if (flyTarget.current) onArriveRef.current?.(flyTarget.current);
+      }
       return;
     }
 

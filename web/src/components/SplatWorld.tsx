@@ -1,12 +1,13 @@
 "use client";
 
 import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useManifest } from "@/hooks/useManifest";
 import FreeFly from "@/components/FreeFly";
 import Memories from "@/components/Memories";
 import Starfield from "@/components/Starfield";
 import StreetGrid from "@/components/StreetGrid";
+import TravelOverlay from "@/components/TravelOverlay";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
 // Stable empty list so FreeFly's effects don't re-bind before the manifest loads.
@@ -41,25 +42,10 @@ function Crosshair() {
   );
 }
 
-function Hud({ text }: { text: string }) {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        left: 12,
-        bottom: 12,
-        color: "#7a8499",
-        font: "13px system-ui, sans-serif",
-        pointerEvents: "none",
-      }}
-    >
-      {text}
-    </div>
-  );
-}
-
 export default function SplatWorld() {
   const m = useManifest();
+  const [current, setCurrent] = useState<MemoryRecord | null>(null);
+  const records = m.status === "ready" ? m.manifest.memories : EMPTY;
 
   return (
     <>
@@ -73,14 +59,15 @@ export default function SplatWorld() {
         <Starfield />
         <StreetGrid />
         {m.status === "ready" && <Memories records={m.manifest.memories} />}
-        <FreeFly records={m.status === "ready" ? m.manifest.memories : EMPTY} speed={25} />
+        <FreeFly records={records} speed={25} onArrive={setCurrent} />
       </Canvas>
       <Crosshair />
-      {m.status === "loading" && <Hud text="Loading memories…" />}
-      {m.status === "error" && <Hud text={`Failed to load memories: ${m.error}`} />}
-      {m.status === "ready" && (
-        <Hud text={`${m.manifest.memories.length} memories · click to look · WASD to fly · aim + click a memory to travel · Esc to release`} />
-      )}
+      <TravelOverlay
+        status={m.status}
+        count={records.length}
+        error={m.status === "error" ? m.error : undefined}
+        current={current}
+      />
     </>
   );
 }
