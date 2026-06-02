@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Collective Memory City — Explorer (S2)
 
-## Getting Started
+The web explorer: a dark-void world you fly through, where each uploaded photo
+appears as a photoreal 3D Gaussian-splat "memory" at its place in the city.
+Next.js (App Router) + React Three Fiber + `@mkkellogg/gaussian-splats-3d`.
 
-First, run the development server:
+## Prerequisites
+
+- Node 22+
+- Splat/thumbnail assets from the S1 pipeline (see seeding below). Until S3 (the
+  contribution app) exists, the explorer runs against a hand-authored
+  `public/memories/manifest.json`.
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd web
+npm install
+
+# Seed the sample assets (git-ignored). From the repo root:
+cp ../samples/output/splats/*.ply public/memories/
+cp ../samples/output/thumbs/*.jpg public/memories/
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev      # dev server at http://localhost:3000
+npm run build    # production build
+npm run start    # serve the production build
+npm test         # unit tests (Vitest)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> **Verify on a production build.** Dev mode (HMR / Fast Refresh) can remount the
+> WebGL viewer mid-load and produce spurious console errors (e.g. a lost context
+> or `visitLeaves`). `next build && next start` — the exhibition's actual mode —
+> has no HMR and runs clean. React StrictMode is disabled for the same reason
+> (the splat canvas is a singleton; production never double-mounts).
 
-## Learn More
+## Configuration
 
-To learn more about Next.js, take a look at the following resources:
+`NEXT_PUBLIC_MEMORIES_BASE_URL` (default `/memories`) is the only place that
+knows where assets live — point it at a static host / CDN for deployment without
+touching code. See `.env.local.example`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Controls
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Click** the canvas to capture the mouse (pointer lock); **Esc** to release.
+- **Mouse** to look; **WASD** to fly in the direction you're looking.
+- Aim the centre dot at a memory and **click** to travel to it (WASD cancels).
 
-## Deploy on Vercel
+## Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Pure, WebGL-free logic lives in `src/lib/**` and is unit-tested; the WebGL Viewer
+is the single mocked seam, proven by the manual smoke test below — mirroring S1's
+"isolate the un-testable seam" philosophy.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `lib/manifest` — parse + validate the explorer manifest; resolve asset URLs.
+- `lib/transform` — map a memory's stored transform to renderer args, applying
+  the SHARP→three.js (180°-about-X) frame correction. No geo math (that's S3).
+- `lib/camera` — fly-to tween, framing, and "look at it and click" picking.
+- `lib/lod` — load/dispose decisions (hysteresis) + scene-index bookkeeping.
+- `components/` — the R3F canvas (`SplatWorld`), the LOD loader (`Memories`),
+  free-fly (`FreeFly`), billboards, starfield, grid, HUD.
+
+## Smoke test (the spec's bar)
+
+> Load 3–5 hand-placed splats; fly + travel; confirm the dark-void renders and is
+> smooth.
+
+Run `npm run build && npm run start`, open http://localhost:3000 in a fresh tab:
+
+- [x] Dark-void world renders.
+- [x] 5 seed memories load at their hand-placed transforms (upright).
+- [x] Free-fly is smooth; click-a-memory smoothly flies the camera to frame it.
+
+### Results
+
+Verified on the RTX 4060 laptop (production build): all 5 seed memories render
+upright in the dark void; free-fly + click-to-travel are smooth; no console
+errors.
+
+### Deferred for now
+
+- **Auto-LOD** (load/dispose-on-approach + photo billboards). The library's
+  dynamic `addSplatScene`/`removeSplatScene` races its async splat-tree build
+  (a null `visitLeaves` crash), so all splats are loaded in one batch instead.
+  The tested decision logic remains in `lib/lod/` for a future, stable approach.
+- **Starfield + procedural grid** — removed by preference; revisit the void
+  aesthetic later.

@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import { useManifest } from "@/hooks/useManifest";
 import FreeFly from "@/components/FreeFly";
 import Memories from "@/components/Memories";
-import Starfield from "@/components/Starfield";
-import StreetGrid from "@/components/StreetGrid";
 import TravelOverlay from "@/components/TravelOverlay";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
@@ -54,10 +52,7 @@ export default function SplatWorld() {
         camera={{ position: [0, 12, 70], fov: 60, near: 0.1, far: 3000 }}
       >
         <color attach="background" args={["#05060a"]} />
-        <fog attach="fog" args={["#05060a", 120, 600]} />
         <ContextLossLogger />
-        <Starfield />
-        <StreetGrid />
         {m.status === "ready" && <Memories records={m.manifest.memories} />}
         <FreeFly records={records} speed={25} onArrive={setCurrent} />
       </Canvas>
