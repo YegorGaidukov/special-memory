@@ -5,6 +5,8 @@ import { useEffect } from "react";
 import { useManifest } from "@/hooks/useManifest";
 import FreeFly from "@/components/FreeFly";
 import Memories from "@/components/Memories";
+import Starfield from "@/components/Starfield";
+import StreetGrid from "@/components/StreetGrid";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
 // Stable empty list so FreeFly's effects don't re-bind before the manifest loads.
@@ -66,7 +68,10 @@ export default function SplatWorld() {
         camera={{ position: [0, 12, 70], fov: 60, near: 0.1, far: 3000 }}
       >
         <color attach="background" args={["#05060a"]} />
+        <fog attach="fog" args={["#05060a", 120, 600]} />
         <ContextLossLogger />
+        <Starfield />
+        <StreetGrid />
         {m.status === "ready" && <Memories records={m.manifest.memories} />}
         <FreeFly records={m.status === "ready" ? m.manifest.memories : EMPTY} speed={25} />
       </Canvas>
