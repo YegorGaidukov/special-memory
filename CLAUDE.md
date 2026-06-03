@@ -55,9 +55,9 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   back to the point cloud past `disposeRadius` (Spark's race-free `initialized`/`dispose` lifecycle
   drives this from the tested `decideLod` in `src/lib/lod/`). Spark does the global splat sort.
   **Deferred:** the starfield/grid, and Spark's built-in per-splat LOD (not needed yet).
-- **S3 — Contribution (web). [BUILT]** The contribution flow in `web/`: a curator uploads a photo
-  (`/contribute`), EXIF GPS auto-drops a MapLibre pin (`/contribute/[id]`) that they drag + set a
-  facing-heading + scale on, then review/ingest/approve in `/admin`. **S3 owns the geo math S2
+- **S3 — Contribution (web). [BUILT]** The contribution flow in `web/`: a curator adds a photo by
+  dropping it on the explorer, EXIF GPS auto-drops a MapLibre pin (`/contribute/[id]`) that they
+  drag + set a facing-heading + scale on, then review/ingest/approve in `/admin`. **S3 owns the geo math S2
   deliberately omits** — `lib/geo/{project,heading,transform}` turns lat/lon + heading + scale into
   the stored `transform` (equirectangular projection about the Wolfsburg origin; heading→yaw
   quaternion matching the seed convention; all pure + unit-tested). State lives in a server-side
