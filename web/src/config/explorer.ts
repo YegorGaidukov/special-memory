@@ -14,6 +14,17 @@ export const LOD = {
   maxConcurrentLoads: 2,
 } as const;
 
+// A distant memory shows a cheap decimated point cloud (its `.preview.ply`)
+// until the camera flies within LOD.loadRadius, when it resolves into the full
+// splat. pointSize is the world-space size of each preview point (metres,
+// distance-attenuated). On load, the point cloud cross-dissolves into the splat
+// over fadeMs. Point count is fixed at build time by `convert-splats`.
+export const PREVIEW = { pointSize: 0.12, fadeMs: 700 } as const;
+
+// How often (ms) to re-evaluate splat residency as the camera moves. The check
+// is cheap (distance compares), so this just avoids running it every frame.
+export const RESIDENCY_TICK_MS = 200;
+
 // Click-to-travel framing.
 export const FLY_TO_DURATION_MS = 1400;
 export const FLY_TO_STANDOFF = 12; // metres from a memory when arriving

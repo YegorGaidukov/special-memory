@@ -2,7 +2,7 @@ import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
 import type { LodConfig, LodDecision } from "./types";
 
 /**
- * Decide which memories to load (splat) or unload (back to billboard) given the
+ * Decide which memories to load (splat) or unload (back to point cloud) given the
  * camera position. Loading happens within loadRadius, disposal only past
  * disposeRadius — the gap is hysteresis so a memory near the boundary doesn't
  * thrash. New loads are the nearest few, capped by maxConcurrentLoads.

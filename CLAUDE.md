@@ -37,16 +37,21 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   (`pipeline/sharp_runner.run_sharp`) so all other logic is unit-tested without a GPU. Confirmed:
   SHARP writes `<stem>.ply` matching the input filename, so the manifest matches outputs by stem.
 - **S2 — Explorer (web). [BUILT]** A `web/` Next.js (App Router) app: React Three Fiber +
-  `@mkkellogg/gaussian-splats-3d`. Renders the dark void and places each memory's splat at its
-  stored `transform` (upright, via a SHARP→three.js 180°-about-X frame correction in
-  `lib/transform/apply.ts`). FPS free-fly (pointer-lock look + WASD-where-you-look) +
+  [Spark](https://sparkjs.dev) (`@sparkjsdev/spark`). Renders the dark void and places each
+  memory's splat at its stored `transform` (upright, via a SHARP→three.js 180°-about-X frame
+  correction in `lib/transform/apply.ts`). FPS free-fly (pointer-lock look + WASD-where-you-look) +
   click-a-memory-to-travel. **Pure logic** (`src/lib/{manifest,transform,camera,lod}`) is
-  unit-tested; the WebGL Viewer is the single mocked seam, proven by a manual smoke test.
-  **S2 does no geo math** — it only reads stored transforms. Until S3 exists it runs on a
-  hand-authored `web/public/memories/manifest.json`. **Deferred for now:** auto-LOD
-  (load/dispose-on-approach + photo billboards — the library's dynamic add/remove races its async
-  splat-tree build, a null `visitLeaves` crash; tested decision logic kept in `src/lib/lod/`) and
-  the starfield/grid; all splats currently batch-load.
+  unit-tested; the WebGL renderer (Spark `SplatMesh`) is the single mocked seam, proven by a manual
+  smoke test. **S2 does no geo math** — it only reads stored transforms. Until S3 exists it runs on
+  a hand-authored `web/public/memories/manifest.json`. **Performance (scales to hundreds):**
+  `npm run convert-splats` turns each SHARP `.ply` into a compressed **SOG** (`.sog`, ~6× smaller,
+  loaded up close) plus a decimated **`.preview.ply`** (~4k-point cloud). Rendering uses **distance
+  residency** — a memory shows its cheap point-cloud "ghost" until the camera enters
+  `LOD.loadRadius`, then **cross-dissolves** into a full `SplatMesh` (smoothstep over
+  `PREVIEW.fadeMs`, animating `SplatMesh.opacity` 0→1 against the point cloud's 1→0) and disposes
+  back to the point cloud past `disposeRadius` (Spark's race-free `initialized`/`dispose` lifecycle
+  drives this from the tested `decideLod` in `src/lib/lod/`). Spark does the global splat sort.
+  **Deferred:** the starfield/grid, and Spark's built-in per-splat LOD (not needed yet).
 - **S3 — Contribution (web).** Upload form → EXIF parse → MapLibre map pin + facing-arrow placement
   → enqueue to S1 → approve flag → memory appears in the explorer.
 
@@ -109,15 +114,17 @@ sharp predict -i <input_image_dir> -o <output_dir>
 The first SHARP run auto-downloads a **~2.6 GB** checkpoint to `~/.cache/torch/hub/checkpoints/`.
 
 **S2 explorer** lives in `web/` (Node 22+, no conda/GPU env). Seed its assets from S1 output first
-(git-ignored): `cp samples/output/splats/*.ply samples/output/thumbs/*.jpg web/public/memories/`.
+(git-ignored): `cp samples/output/splats/*.ply samples/output/thumbs/*.jpg web/public/memories/`,
+then compress them to the `.sog` the explorer loads (`npm run convert-splats`).
 
 ```powershell
 cd web
 npm install
+npm run convert-splats  # .ply -> .sog (compressed web-delivery format) in public/memories/
 npm run dev          # dev server (http://localhost:3000) — for iteration only
 npm run build        # production build
 npm run start        # serve the production build — VERIFY HERE, not dev
-npm test             # Vitest unit tests (pure logic; WebGL Viewer is the mocked seam)
+npm test             # Vitest unit tests (pure logic; WebGL renderer is the mocked seam)
 ```
 
 ## Conventions
@@ -128,13 +135,14 @@ npm test             # Vitest unit tests (pure logic; WebGL Viewer is the mocked
   Vitest-tested; the WebGL Viewer is the single mocked seam, proven by the manual browser smoke
   test. Don't unit-test the GPU/WebGL.
 - **S2 gotchas:** React StrictMode is **disabled** (`web/next.config.ts`) — its dev double-mount
-  tore down the splat viewer's WebGL context. The renderer's worker sort needs **COOP/COEP**
-  headers (set in `next.config.ts`) for SharedArrayBuffer. `@mkkellogg/gaussian-splats-3d` ships no
-  types — see the hand-written decl in `web/src/types/`.
+  tore down the splat renderer's WebGL context. Spark's worker sort needs **COOP/COEP** headers
+  (set in `next.config.ts`) for SharedArrayBuffer. Spark ships its own types and inlines its
+  workers (no `.wasm` to host). Verify on a **production build** (`npm run build && npm run start`),
+  not dev — HMR remounts the WebGL canvas and throws spurious errors.
 - Small, single-responsibility modules in `pipeline/` (`thumbnails`, `sharp_runner`, `manifest`,
   `cli`). Files that change together live together.
 - This project follows the **superpowers** workflow: specs live in `docs/superpowers/specs/`, plans
   in `docs/superpowers/plans/`. Brainstorm → spec → plan → implement; commit frequently.
-- Splat/binary outputs (`*.ply`, `*.ksplat`, `outputs/`, `samples/`) are git-ignored — keep them
-  local. In `web/`, `node_modules/`, `.next/`, and the seed binaries under `public/memories/`
-  (`*.ply`/`*.jpg`) are ignored; `manifest.json` + READMEs there are tracked.
+- Splat/binary outputs (`*.ply`, `*.sog`, `*.ksplat`, `outputs/`, `samples/`) are git-ignored — keep
+  them local. In `web/`, `node_modules/`, `.next/`, and the seed binaries under `public/memories/`
+  (`*.ply`/`*.sog`/`*.jpg`) are ignored; `manifest.json` + READMEs there are tracked.

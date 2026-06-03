@@ -1,7 +1,7 @@
 import type { MemoryRecord, Quat, Vec3 } from "@/lib/manifest/types";
 import { multiplyQuat } from "@/lib/math/quat";
 
-/** Arguments handed verbatim to the renderer's addSplatScene (and the billboard). */
+/** Placement args applied to a memory's Spark SplatMesh (and its point-cloud preview). */
 export interface SplatSceneArgs {
   position: Vec3;
   /** The renderer calls this `rotation`, but it is a quaternion [x,y,z,w]. */

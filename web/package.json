@@ -7,19 +7,21 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "convert-splats": "node scripts/convert-splats.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mkkellogg/gaussian-splats-3d": "^0.4.7",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "@sparkjsdev/spark": "^2.1.0",
     "next": "16.2.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "three": "^0.184.0"
   },
   "devDependencies": {
+    "@playcanvas/splat-transform": "^2.4.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

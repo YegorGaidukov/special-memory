@@ -37,6 +37,7 @@ yarn-error.log*
 # seed memory assets: large/binary splats + thumbnails stay local.
 # manifest.json and README.md ARE tracked (small, hand-authored source).
 /public/memories/*.ply
+/public/memories/*.sog
 /public/memories/*.ksplat
 /public/memories/*.jpg
 /public/memories/*.jpeg

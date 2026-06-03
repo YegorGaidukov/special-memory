@@ -49,6 +49,13 @@ export default function SplatWorld() {
     <>
       <Canvas
         style={{ position: "fixed", inset: 0 }}
+        // Cap device-pixel-ratio: splats are fill-rate bound, so rendering at a
+        // retina 2x+ costs ~4x the fragments for little visible gain. [1, 1.5]
+        // keeps it crisp while bounding the pixel count on high-DPI displays.
+        dpr={[1, 1.5]}
+        // Spark advises antialias:false — MSAA doesn't improve Gaussian splats
+        // and significantly reduces performance.
+        gl={{ antialias: false }}
         camera={{ position: [0, 12, 70], fov: 60, near: 0.1, far: 3000 }}
       >
         <color attach="background" args={["#05060a"]} />

@@ -1,18 +1,38 @@
 {
-  "city": { "name": "Demo City", "origin_lat": 0, "origin_lon": 0 },
+  "city": {
+    "name": "Demo City",
+    "origin_lat": 0,
+    "origin_lon": 0
+  },
   "memories": [
     {
       "id": "mem-01",
       "status": "approved",
       "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.ply",
+      "splat_url": "photo_2026-06-02_21-59-01.sog",
       "captured_at": "2026-06-02T21:59:01Z",
-      "geo": { "lat": 0, "lon": 0 },
+      "geo": {
+        "lat": 0,
+        "lon": 0
+      },
       "heading_deg": 0,
       "transform": {
-        "position": [0, 0, 0],
-        "quaternion": [0, 0, 0, 1],
-        "scale": [1, 1, 1]
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
       },
       "created_at": "2026-06-02T22:00:00Z"
     },
@@ -20,14 +40,30 @@
       "id": "mem-02",
       "status": "approved",
       "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.ply",
+      "splat_url": "photo_2026-06-02_21-59-01.sog",
       "captured_at": "2026-06-02T21:59:01Z",
-      "geo": { "lat": 0, "lon": 0 },
+      "geo": {
+        "lat": 0,
+        "lon": 0
+      },
       "heading_deg": 0,
       "transform": {
-        "position": [30, 0, 0],
-        "quaternion": [0, 0, 0, 1],
-        "scale": [1, 1, 1]
+        "position": [
+          30,
+          0,
+          0
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
       },
       "created_at": "2026-06-02T22:00:00Z"
     },
@@ -35,14 +71,30 @@
       "id": "mem-03",
       "status": "approved",
       "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.ply",
+      "splat_url": "photo_2026-06-02_21-59-01.sog",
       "captured_at": "2026-06-02T21:59:01Z",
-      "geo": { "lat": 0, "lon": 0 },
+      "geo": {
+        "lat": 0,
+        "lon": 0
+      },
       "heading_deg": 45,
       "transform": {
-        "position": [-25, 0, 20],
-        "quaternion": [0, 0.38268343, 0, 0.92387953],
-        "scale": [1, 1, 1]
+        "position": [
+          -25,
+          0,
+          20
+        ],
+        "quaternion": [
+          0,
+          0.38268343,
+          0,
+          0.92387953
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
       },
       "created_at": "2026-06-02T22:00:00Z"
     },
@@ -50,14 +102,30 @@
       "id": "mem-04",
       "status": "approved",
       "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.ply",
+      "splat_url": "photo_2026-06-02_21-59-01.sog",
       "captured_at": "2026-06-02T21:59:01Z",
-      "geo": { "lat": 0, "lon": 0 },
+      "geo": {
+        "lat": 0,
+        "lon": 0
+      },
       "heading_deg": 90,
       "transform": {
-        "position": [10, 0, -40],
-        "quaternion": [0, 0.70710678, 0, 0.70710678],
-        "scale": [1, 1, 1]
+        "position": [
+          10,
+          0,
+          -40
+        ],
+        "quaternion": [
+          0,
+          0.70710678,
+          0,
+          0.70710678
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
       },
       "created_at": "2026-06-02T22:00:00Z"
     },
@@ -65,14 +133,30 @@
       "id": "mem-05",
       "status": "approved",
       "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.ply",
+      "splat_url": "photo_2026-06-02_21-59-01.sog",
       "captured_at": "2026-06-02T21:59:01Z",
-      "geo": { "lat": 0, "lon": 0 },
+      "geo": {
+        "lat": 0,
+        "lon": 0
+      },
       "heading_deg": -45,
       "transform": {
-        "position": [-45, 0, -15],
-        "quaternion": [0, -0.38268343, 0, 0.92387953],
-        "scale": [1, 1, 1]
+        "position": [
+          -45,
+          0,
+          -15
+        ],
+        "quaternion": [
+          0,
+          -0.38268343,
+          0,
+          0.92387953
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
       },
       "created_at": "2026-06-02T22:00:00Z"
     }

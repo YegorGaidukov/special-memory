@@ -7,7 +7,9 @@ For the exhibition this base URL can point at a static host / CDN instead — no
 ## What's tracked vs. local
 
 - **Tracked in git:** `manifest.json` (hand-authored, small) and this `README.md`.
-- **Local only (git-ignored):** the splat `*.ply` (~63 MB each) and thumbnail `*.jpg`.
+- **Local only (git-ignored):** the splats `*.ply` (~63 MB, archival), the
+  compressed `*.sog` (~10 MB, loaded up close), the decimated `*.preview.ply`
+  (~220 KB, the distant point-cloud ghost), and thumbnail `*.jpg`.
   See `web/.gitignore`. After cloning, re-seed them (below) before running the explorer.
 
 ## Re-seeding the sample assets
@@ -19,6 +21,9 @@ Until S3 (the contribution app) exists, the explorer runs against this hand-auth
 # from the repo root
 cp samples/output/splats/*.ply web/public/memories/
 cp samples/output/thumbs/*.jpg web/public/memories/
+
+# then compress .ply -> .sog (the format the explorer actually loads):
+cd web && npm run convert-splats
 ```
 
 The current `manifest.json` seeds **5 memories** that all reference the same sample
@@ -36,7 +41,7 @@ without re-running the GPU.
       "id": "mem-01",
       "status": "approved",            // explorer shows approved/ready
       "thumbnail_url": "<file>.jpg",   // relative to NEXT_PUBLIC_MEMORIES_BASE_URL
-      "splat_url": "<file>.ply",       // relative to the same base
+      "splat_url": "<file>.sog",       // relative to the same base (SOG-compressed)
       "captured_at": "ISO-8601",
       "geo": { "lat": 0, "lon": 0 },   // informational; S2 does NO geo math
       "heading_deg": 0,
