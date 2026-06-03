@@ -16,8 +16,9 @@ export async function GET() {
 }
 
 // POST /api/memories — multipart upload. Saves the original, copies it to the
-// recon inbox for the curator's manual SHARP run, parses EXIF for an initial
-// placement, and creates an `uploaded` record. Open (no auth).
+// recon inbox for the GPU watcher's SHARP run, parses EXIF for an initial
+// placement, and creates a `processing` record (the watcher takes it from here).
+// Open (no auth).
 export async function POST(request: NextRequest) {
   const form = await request.formData();
   const file = form.get("photo");
@@ -38,7 +39,9 @@ export async function POST(request: NextRequest) {
 
   const record: ContribRecord = {
     id,
-    status: "uploaded",
+    // Reconstruction is auto-triggered (the GPU watcher picks the inbox copy up),
+    // so a fresh upload is already "processing", not merely "uploaded".
+    status: "processing",
     source_image: filename,
     thumbnail_url: "",
     splat_url: "",
