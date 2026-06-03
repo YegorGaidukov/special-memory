@@ -4,6 +4,7 @@ import type {
   CityConfig,
   ExplorerManifest,
   MemoryRecord,
+  Transform,
 } from "@/lib/manifest/types";
 import type { ContribStore } from "./types";
 import { parseManifest } from "@/lib/manifest/parse";
@@ -66,4 +67,58 @@ export async function publishManifest(
   }
   const manifest = mergeManifest(existing, store, city);
   await writeFile(path, JSON.stringify(manifest, null, 2));
+}
+
+interface RawMemory {
+  id?: unknown;
+  [key: string]: unknown;
+}
+interface RawManifest {
+  memories?: unknown;
+  [key: string]: unknown;
+}
+
+/**
+ * Pure: replace one memory's `transform` in a raw manifest, preserving every
+ * other field. Used for hand-authored seed memories that live only in the
+ * published manifest (not the S3 store), so the explorer's edit mode can move
+ * them. `found` is false when the id isn't present.
+ */
+export function patchManifestMemoryTransform(
+  raw: RawManifest,
+  id: string,
+  transform: Transform,
+): { manifest: RawManifest; found: boolean } {
+  const memories = Array.isArray(raw.memories) ? (raw.memories as RawMemory[]) : [];
+  let found = false;
+  const next = memories.map((m) => {
+    if (m && m.id === id) {
+      found = true;
+      return { ...m, transform };
+    }
+    return m;
+  });
+  return { manifest: { ...raw, memories: next }, found };
+}
+
+/**
+ * fs seam: patch a single memory's transform directly in the published manifest.
+ * Returns false (so the caller can 404) when the manifest is missing/unreadable
+ * or the id isn't in it.
+ */
+export async function patchPublishedTransform(
+  id: string,
+  transform: Transform,
+): Promise<boolean> {
+  const path = join(PUBLIC_MEMORIES_DIR, "manifest.json");
+  let raw: RawManifest;
+  try {
+    raw = JSON.parse(await readFile(path, "utf8")) as RawManifest;
+  } catch {
+    return false;
+  }
+  const { manifest, found } = patchManifestMemoryTransform(raw, id, transform);
+  if (!found) return false;
+  await writeFile(path, JSON.stringify(manifest, null, 2));
+  return true;
 }

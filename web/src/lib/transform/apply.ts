@@ -1,5 +1,5 @@
 import type { MemoryRecord, Quat, Vec3 } from "@/lib/manifest/types";
-import { multiplyQuat } from "@/lib/math/quat";
+import { multiplyQuat, conjugateQuat } from "@/lib/math/quat";
 
 /** Placement args applied to a memory's Spark SplatMesh (and its point-cloud preview). */
 export interface SplatSceneArgs {
@@ -32,4 +32,63 @@ export function toSplatSceneArgs(record: MemoryRecord): SplatSceneArgs {
     rotation: multiplyQuat(quaternion, SHARP_TO_THREE),
     scale: normalizeScale(scale),
   };
+}
+
+/** A stored transform with uniform (scalar) scale — what a gizmo edit produces. */
+export interface StoredTransform {
+  position: Vec3;
+  quaternion: Quat;
+  scale: number;
+}
+
+/**
+ * Inverse of {@link toSplatSceneArgs}: read renderer placement args (a mesh's
+ * live transform) back into a stored transform. Right-multiplying the rotation
+ * by `conjugate(SHARP_TO_THREE)` exactly undoes `toSplatSceneArgs`'s right-
+ * multiply by `SHARP_TO_THREE` (q·s·s⁻¹ = q), for any correction quaternion.
+ * Scale collapses to a uniform scalar — gizmo edits keep it uniform (see
+ * `readMeshTransform`), and SHARP splats are metric, so a single value suffices.
+ */
+export function fromSplatSceneArgs(args: SplatSceneArgs): StoredTransform {
+  return {
+    position: args.position,
+    quaternion: multiplyQuat(args.rotation, conjugateQuat(SHARP_TO_THREE)),
+    scale: args.scale[0],
+  };
+}
+
+/** Minimal shape of a three.js Object3D transform, so this module stays three-free. */
+interface MeshTransform {
+  position: { x: number; y: number; z: number };
+  quaternion: { x: number; y: number; z: number; w: number };
+  scale: { x: number; y: number; z: number };
+}
+
+/** Read a live mesh's transform back into a stored transform (gizmo → record). */
+export function readMeshTransform(obj: MeshTransform): StoredTransform {
+  return fromSplatSceneArgs({
+    position: [obj.position.x, obj.position.y, obj.position.z],
+    rotation: [obj.quaternion.x, obj.quaternion.y, obj.quaternion.z, obj.quaternion.w],
+    scale: [obj.scale.x, obj.scale.y, obj.scale.z],
+  });
+}
+
+/** Minimal mutable shape of a three.js Object3D transform (the setters we drive). */
+interface MutableMeshTransform {
+  position: { set(x: number, y: number, z: number): void };
+  quaternion: { set(x: number, y: number, z: number, w: number): void };
+  scale: { setScalar(s: number): void };
+}
+
+/**
+ * Write a stored transform onto a live mesh — the forward of
+ * {@link readMeshTransform}, so a numeric field edit in the HUD moves the splat
+ * (and the gizmo, which follows the object each frame). Applies the same
+ * SHARP→three.js correction `toSplatSceneArgs` does, and sets a uniform scale.
+ */
+export function applyStoredTransform(obj: MutableMeshTransform, t: StoredTransform): void {
+  const rotation = multiplyQuat(t.quaternion, SHARP_TO_THREE);
+  obj.position.set(t.position[0], t.position[1], t.position[2]);
+  obj.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+  obj.scale.setScalar(t.scale);
 }

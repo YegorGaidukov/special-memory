@@ -2,8 +2,16 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import PlacementMap, { type Placement } from "./PlacementMap";
 import type { ContribRecord } from "@/server/types";
+import styles from "./page.module.css";
+
+// WebGL/Spark editor — never server-render it (mirrors ExplorerCanvas).
+const MemoryEditor3D = dynamic(() => import("@/components/MemoryEditor3D"), {
+  ssr: false,
+  loading: () => <p className={styles.muted}>Loading 3D editor…</p>,
+});
 
 export default function PlacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -35,15 +43,27 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
     setDone(true);
   }
 
-  if (error) return <main style={wrap}><p style={{ color: "#ff8080" }}>{error}</p></main>;
-  if (!record) return <main style={wrap}><p>Loading…</p></main>;
+  if (error)
+    return (
+      <main className={styles.wrap}>
+        <p className={styles.error}>{error}</p>
+      </main>
+    );
+  if (!record)
+    return (
+      <main className={styles.wrap}>
+        <p className={styles.muted}>Loading…</p>
+      </main>
+    );
 
   return (
-    <main style={wrap}>
-      <h1>Place this memory</h1>
-      <p style={{ color: "#9aa3b8" }}>
+    <main className={styles.wrap}>
+      <h1 className={styles.title}>Place this memory</h1>
+      <p className={styles.lead}>
         {record.source_image}
-        {record.geo ? " — pin auto-placed from photo GPS; drag to adjust." : " — no GPS in photo; drop the pin manually."}
+        {record.geo
+          ? " — pin auto-placed from photo GPS; drag to adjust."
+          : " — no GPS in photo; drop the pin manually."}
       </p>
       <PlacementMap
         initial={{
@@ -54,22 +74,34 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
         }}
         onSave={save}
       />
-      {done && (
-        <p style={{ color: "#80ff9f" }}>
-          Saved. Next: run SHARP on the inbox image, drop <code>{record.id}.sog</code> into
-          public/memories, then ingest + approve in{" "}
-          <button onClick={() => router.push("/admin")} style={{ textDecoration: "underline" }}>
-            the review queue
-          </button>.
+      {record.status === "ready" || record.status === "approved" ? (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Fine-tune in 3D</h2>
+          <p className={styles.sectionLead}>
+            Drag the gizmo (or type exact values) to place, rotate, and scale the splat directly.
+            Saving here writes the transform straight to the record; re-saving the map above
+            recomputes it from the pin.
+          </p>
+          <MemoryEditor3D record={record} />
+        </section>
+      ) : (
+        <p className={styles.locked}>
+          3D placement unlocks once the splat is ingested (status “ready”).
         </p>
+      )}
+      {done && (
+        <div className={styles.note}>
+          <span className={styles.noteTitle}>✓ Saved</span>
+          <span>
+            Next: run SHARP on the inbox image, drop <code className={styles.code}>{record.id}.sog</code>{" "}
+            into public/memories, then ingest + approve in{" "}
+            <button className={styles.link} onClick={() => router.push("/admin")}>
+              the review queue
+            </button>
+            .
+          </span>
+        </div>
       )}
     </main>
   );
 }
-
-const wrap: React.CSSProperties = {
-  maxWidth: 640,
-  margin: "6vh auto",
-  font: "16px system-ui",
-  color: "#e6e9f0",
-};

@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import styles from "./PlacementMap.module.css";
+
+// An accent-filled track for a range input, as an inline background gradient.
+function trackFill(pct: number): string {
+  return `linear-gradient(to right, var(--accent) ${pct}%, var(--line-strong) ${pct}%)`;
+}
 
 const WOLFSBURG = { lat: 52.4227, lon: 10.7865 };
 
@@ -83,35 +89,48 @@ export default function PlacementMap({
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div ref={container} style={{ width: "100%", height: 360, borderRadius: 8 }} />
-      <label>
-        Facing heading: {heading}° (0 = north, 90 = east)
+    <div className={styles.controls}>
+      <div ref={container} className={styles.map} />
+
+      <div className={styles.control}>
+        <div className={styles.controlHead}>
+          <span className={styles.label}>Facing heading</span>
+          <span className={styles.value}>{heading}°</span>
+        </div>
         <input
+          className={styles.range}
           type="range"
           min={0}
           max={359}
           value={heading}
           onChange={(e) => setHeading(Number(e.target.value))}
-          style={{ width: "100%" }}
+          style={{ background: trackFill((heading / 359) * 100) }}
         />
-      </label>
-      <label>
-        Scale nudge: ×{scale.toFixed(2)}
+        <span className={styles.hint}>0 = north, 90 = east</span>
+      </div>
+
+      <div className={styles.control}>
+        <div className={styles.controlHead}>
+          <span className={styles.label}>Scale nudge</span>
+          <span className={styles.value}>×{scale.toFixed(2)}</span>
+        </div>
         <input
+          className={styles.range}
           type="range"
           min={0.25}
           max={3}
           step={0.05}
           value={scale}
           onChange={(e) => setScale(Number(e.target.value))}
-          style={{ width: "100%" }}
+          style={{ background: trackFill(((scale - 0.25) / (3 - 0.25)) * 100) }}
         />
-      </label>
-      <p style={{ font: "13px monospace", color: "#9aa3b8" }}>
+      </div>
+
+      <p className={styles.readout}>
         lat {lat.toFixed(5)}, lon {lon.toFixed(5)}
       </p>
-      <button onClick={save} disabled={saving} style={{ padding: "8px 16px" }}>
+
+      <button className={styles.save} onClick={save} disabled={saving}>
         {saving ? "Saving…" : "Save placement"}
       </button>
     </div>

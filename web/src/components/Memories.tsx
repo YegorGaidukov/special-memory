@@ -1,7 +1,7 @@
 "use client";
 
 import { useThree, useFrame } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import {
@@ -12,9 +12,16 @@ import {
 } from "@/config/explorer";
 import { resolveAssetUrl } from "@/lib/manifest/url";
 import { toSplatSceneArgs } from "@/lib/transform/apply";
+import { recordsSignature } from "@/lib/transform/overlay";
 import { decideLod } from "@/lib/lod/decide";
 import { previewUrlFor } from "@/lib/lod/previewUrl";
 import { loadPreviewPoints } from "@/lib/splat/loadPreviewPoints";
+import {
+  setResident,
+  clearResident,
+  setBounds,
+  clearBounds,
+} from "@/lib/splat/registry";
 import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
 
 // Places every memory in the void and manages its level of detail. Each memory
@@ -27,10 +34,31 @@ import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
 // SplatMesh objects. Spark's per-mesh `initialized`/`dispose()` lifecycle has no
 // add/remove race (the reason auto-LOD was deferred under the old library), so
 // `decideLod()` can drive residency directly, holding each mesh by reference.
-export default function Memories({ records }: { records: MemoryRecord[] }) {
+export default function Memories({
+  records,
+  forceResidentId = null,
+}: {
+  records: MemoryRecord[];
+  // Keep this memory's full splat resident regardless of distance (the explorer
+  // edit mode pins the selected memory so its gizmo can attach to a loaded mesh).
+  forceResidentId?: string | null;
+}) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
+
+  // Read inside useFrame without re-binding the loop each render.
+  const forceResidentIdRef = useRef(forceResidentId);
+  forceResidentIdRef.current = forceResidentId;
+
+  // Latest records, read inside useFrame / async callbacks so transform edits are
+  // picked up without tearing the SparkRenderer down. The heavy setup effect
+  // keys on `sig` (id + splat_url set) — a placement edit changes `records`
+  // identity but not `sig`, so it re-places splats in place (the effect below)
+  // rather than reloading every splat.
+  const recordsRef = useRef(records);
+  recordsRef.current = records;
+  const sig = useMemo(() => recordsSignature(records), [records]);
 
   const sparkRef = useRef<SparkRenderer | null>(null);
   const previews = useRef<Map<string, THREE.Points>>(new Map());
@@ -53,17 +81,25 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
 
     const ac = new AbortController();
     for (const r of records) {
-      const { position, rotation, scale } = toSplatSceneArgs(r);
       const url = resolveAssetUrl(MEMORIES_BASE_URL, previewUrlFor(r.splat_url));
       loadPreviewPoints(url, PREVIEW.pointSize, ac.signal)
         .then((pts) => {
-          // Place the ghost exactly where the full splat will sit.
+          // Place the ghost exactly where the full splat will sit — reading the
+          // latest record so a preview that finishes loading after an edit lands
+          // at the edited placement, not the one captured when setup ran.
+          const { position, rotation, scale } = toSplatSceneArgs(
+            recordsRef.current.find((x) => x.id === r.id) ?? r,
+          );
           pts.position.set(position[0], position[1], position[2]);
           pts.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
           pts.scale.setScalar(scale[0]); // SplatMesh scale is uniform
           // If the full splat already loaded while we were fetching, stay hidden.
           if (splats.current.has(r.id)) pts.visible = false;
           previews.current.set(r.id, pts);
+          // Cache the splat's LOCAL bbox (geometry space, before placement) for
+          // the edit mode's corner markers + click picking.
+          pts.geometry.computeBoundingBox();
+          if (pts.geometry.boundingBox) setBounds(r.id, pts.geometry.boundingBox.clone());
           scene.add(pts);
         })
         .catch((err) => {
@@ -78,13 +114,15 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
     return () => {
       ac.abort();
       activeFades.clear();
-      for (const pts of loadedPreviews.values()) {
+      for (const [id, pts] of loadedPreviews) {
+        clearBounds(id);
         scene.remove(pts);
         pts.geometry.dispose();
         (pts.material as THREE.Material).dispose();
       }
       loadedPreviews.clear();
-      for (const mesh of loadedSplats.values()) {
+      for (const [id, mesh] of loadedSplats) {
+        clearResident(id);
         scene.remove(mesh);
         mesh.dispose();
       }
@@ -93,9 +131,36 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
       spark.dispose();
       sparkRef.current = null;
     };
-  }, [gl, scene, records]);
+  }, [gl, scene, sig]);
+
+  // Re-place ghosts + resident splats in place when a memory's stored transform
+  // changes (a curator edit overlaid onto `records`), without rebuilding the
+  // SparkRenderer. The actively-pinned memory (forceResidentId) is skipped — the
+  // gizmo owns its live mesh, and its overlay value was mirrored from that mesh.
+  // Re-runs when the pin moves too, so the just-released memory's ghost (which
+  // was skipped while pinned) is synced to its edited placement on deselect/exit
+  // — otherwise it snaps back to the stale ghost position when LOD recycles it.
+  useEffect(() => {
+    for (const r of records) {
+      if (r.id === forceResidentId) continue;
+      const { position, rotation, scale } = toSplatSceneArgs(r);
+      const ghost = previews.current.get(r.id);
+      if (ghost) {
+        ghost.position.set(position[0], position[1], position[2]);
+        ghost.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+        ghost.scale.setScalar(scale[0]);
+      }
+      const splat = splats.current.get(r.id);
+      if (splat) {
+        splat.position.set(position[0], position[1], position[2]);
+        splat.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+        splat.scale.setScalar(scale[0]);
+      }
+    }
+  }, [records, forceResidentId]);
 
   useFrame((_, delta) => {
+    const records = recordsRef.current;
     if (records.length === 0) return;
 
     // Every frame: advance any point-cloud -> splat cross-dissolves.
@@ -120,6 +185,7 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
             f.points.visible = true;
             (f.points.material as THREE.PointsMaterial).opacity = 1;
           }
+          clearResident(id);
           splats.current.delete(id);
           scene.remove(f.mesh);
           f.mesh.dispose();
@@ -139,7 +205,17 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
     const resident = new Set(
       [...splats.current.keys()].filter((id) => fades.current.get(id)?.dir !== -1),
     );
-    const { toLoad, toUnload } = decideLod(records, camPos, resident, LOD);
+    const decided = decideLod(records, camPos, resident, LOD);
+    let toLoad = decided.toLoad;
+    let toUnload = decided.toUnload;
+
+    // Pin the explorer-selected memory: never unload it, and force it to load
+    // even when the camera is far, so the edit gizmo always has a real mesh.
+    const force = forceResidentIdRef.current;
+    if (force) {
+      toUnload = toUnload.filter((id) => id !== force);
+      if (!resident.has(force) && !toLoad.includes(force)) toLoad = [...toLoad, force];
+    }
 
     for (const id of toLoad) {
       const r = records.find((x) => x.id === id);
@@ -174,11 +250,14 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
           // Cross-dissolve the point cloud into the splat — but only if this mesh
           // is still the resident one (it may have been disposed mid-load).
           if (splats.current.get(id) !== mesh) return;
+          // Resident and loaded: expose it so the edit gizmo can attach.
+          setResident(id, mesh);
           fades.current.set(id, { mesh, points: previews.current.get(id), t: 0, dir: 1 });
         })
         .catch((err) => {
           if (splats.current.get(id) !== mesh) return; // disposed mid-load
           console.error("[explorer] splat load failed", id, err);
+          clearResident(id);
           splats.current.delete(id);
           scene.remove(mesh);
           mesh.dispose();
@@ -192,6 +271,7 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
       // Never faded in (still loading) — nothing on screen to dissolve, so
       // dispose now; its `initialized` handler sees it's gone and bails.
       if (!f && mesh.opacity === 0) {
+        clearResident(id);
         splats.current.delete(id);
         scene.remove(mesh);
         mesh.dispose();

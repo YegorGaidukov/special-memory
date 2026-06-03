@@ -14,3 +14,12 @@ export function multiplyQuat(a: Quat, b: Quat): Quat {
     aw * bw - ax * bx - ay * by - az * bz,
   ];
 }
+
+/**
+ * Conjugate of a quaternion [x,y,z,w] → [-x,-y,-z,w]. For a unit quaternion this
+ * is its inverse rotation, so `multiplyQuat(multiplyQuat(q, s), conjugateQuat(s))`
+ * returns `q` — the basis for undoing a fixed frame correction (see apply.ts).
+ */
+export function conjugateQuat(q: Quat): Quat {
+  return [-q[0], -q[1], -q[2], q[3]];
+}

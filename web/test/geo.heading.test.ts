@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headingToQuaternion } from "@/lib/geo/heading";
+import { headingToQuaternion, quaternionToHeadingDeg } from "@/lib/geo/heading";
 
 describe("headingToQuaternion", () => {
   it("maps heading 0 to the identity quaternion", () => {
@@ -33,5 +33,30 @@ describe("headingToQuaternion", () => {
     const [x, , z] = headingToQuaternion(-45);
     expect(x).toBe(0);
     expect(z).toBe(0);
+  });
+});
+
+describe("quaternionToHeadingDeg", () => {
+  it("maps the identity quaternion to heading 0", () => {
+    expect(quaternionToHeadingDeg([0, 0, 0, 1])).toBeCloseTo(0, 6);
+  });
+
+  it("round-trips headingToQuaternion for headings across the circle", () => {
+    for (const deg of [0, 45, 90, 123, 180, 270, 359]) {
+      expect(quaternionToHeadingDeg(headingToQuaternion(deg))).toBeCloseTo(deg, 4);
+    }
+  });
+
+  it("normalizes the result into [0, 360)", () => {
+    const h = quaternionToHeadingDeg(headingToQuaternion(-45));
+    expect(h).toBeGreaterThanOrEqual(0);
+    expect(h).toBeLessThan(360);
+    expect(h).toBeCloseTo(315, 4);
+  });
+
+  it("extracts the yaw component, ignoring pitch/roll", () => {
+    // A pure 90°-about-Y quaternion still reads as heading 90 even though the
+    // gizmo may add small tilt; here the input is exactly yaw-only.
+    expect(quaternionToHeadingDeg([0, 0.70710678, 0, 0.70710678])).toBeCloseTo(90, 4);
   });
 });
