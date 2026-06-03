@@ -7,20 +7,35 @@ import type { MemoryRecord } from "@/lib/manifest/types";
 import { toSplatSceneArgs } from "@/lib/transform/apply";
 import { getBounds, getResident } from "@/lib/splat/registry";
 
-// The 8 corners of a local-space box.
-function corners(box: THREE.Box3): THREE.Vector3[] {
+// Fraction of each edge that a corner bracket extends along that edge.
+const BRACKET_FRAC = 0.2;
+
+// Build the line segments for 8 corner brackets: at each corner, three short
+// segments running along the three edges that meet there. Returns a flat
+// [x,y,z, x,y,z, ...] vertex buffer (2 verts per segment, 24 segments).
+function bracketPositions(box: THREE.Box3): Float32Array {
   const { min, max } = box;
-  const out: THREE.Vector3[] = [];
+  const sx = (max.x - min.x) * BRACKET_FRAC;
+  const sy = (max.y - min.y) * BRACKET_FRAC;
+  const sz = (max.z - min.z) * BRACKET_FRAC;
+  const verts: number[] = [];
   for (const x of [min.x, max.x])
     for (const y of [min.y, max.y])
-      for (const z of [min.z, max.z]) out.push(new THREE.Vector3(x, y, z));
-  return out;
+      for (const z of [min.z, max.z]) {
+        const dx = x === min.x ? sx : -sx;
+        const dy = y === min.y ? sy : -sy;
+        const dz = z === min.z ? sz : -sz;
+        verts.push(x, y, z, x + dx, y, z); // along X
+        verts.push(x, y, z, x, y + dy, z); // along Y
+        verts.push(x, y, z, x, y, z + dz); // along Z
+      }
+  return new Float32Array(verts);
 }
 
-// Corner markers (+ a faint wireframe) for one memory's bounding box. The group
-// carries the memory's placement, so corners inherit its rotation/scale. The
-// selected memory mirrors its live (gizmo-driven) mesh each frame so the box
-// tracks edits before they're saved.
+// Corner brackets for one memory's bounding box. The group carries the memory's
+// placement, so the brackets inherit its rotation/scale. The selected memory
+// mirrors its live (gizmo-driven) mesh each frame so the box tracks edits before
+// they're saved.
 function CornerBox({
   id,
   box,
@@ -37,14 +52,8 @@ function CornerBox({
   selected: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const pts = useMemo(() => corners(box), [box]);
-  const size = useMemo(() => box.getSize(new THREE.Vector3()), [box]);
-  const center = useMemo(() => box.getCenter(new THREE.Vector3()), [box]);
-  const r = useMemo(
-    () => Math.max(Math.max(size.x, size.y, size.z) * 0.03, 0.05),
-    [size],
-  );
-  const color = selected ? "#9ad0ff" : "#54618a";
+  const positions = useMemo(() => bracketPositions(box), [box]);
+  const color = selected ? "#e6e9f0" : "#5b6b8c";
 
   useFrame(() => {
     const g = groupRef.current;
@@ -59,32 +68,22 @@ function CornerBox({
 
   return (
     <group ref={groupRef} position={position} quaternion={quaternion} scale={scale}>
-      <mesh position={center}>
-        <boxGeometry args={[size.x, size.y, size.z]} />
-        <meshBasicMaterial
+      <lineSegments>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial
           color={color}
-          wireframe
           transparent
-          opacity={selected ? 0.25 : 0.12}
+          opacity={selected ? 1 : 0.5}
           depthTest={false}
         />
-      </mesh>
-      {pts.map((c, i) => (
-        <mesh key={i} position={c}>
-          <sphereGeometry args={[r, 8, 8]} />
-          <meshBasicMaterial
-            color={color}
-            transparent
-            opacity={selected ? 1 : 0.7}
-            depthTest={false}
-          />
-        </mesh>
-      ))}
+      </lineSegments>
     </group>
   );
 }
 
-/** Bounding-box corner markers for every memory while edit mode is active. */
+/** Bounding-box corner brackets for every memory while edit mode is active. */
 export default function EditBoxes({
   records,
   selectedId,
