@@ -39,7 +39,7 @@ describe("toExplorerManifest", () => {
 
   it("drops the server-only source_image field", () => {
     const store: ContribStore = { records: [rec("a")] };
-    const m = toExplorerManifest(store, CITY).memories[0] as Record<string, unknown>;
+    const m = toExplorerManifest(store, CITY).memories[0] as unknown as Record<string, unknown>;
     expect("source_image" in m).toBe(false);
   });
 
