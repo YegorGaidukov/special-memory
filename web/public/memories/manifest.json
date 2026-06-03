@@ -8,8 +8,8 @@
     {
       "id": "mem-01",
       "status": "approved",
-      "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.sog",
+      "thumbnail_url": "mem-01.jpg",
+      "splat_url": "mem-01.sog",
       "captured_at": "2026-06-02T21:59:01Z",
       "geo": {
         "lat": 0,
@@ -39,8 +39,8 @@
     {
       "id": "mem-02",
       "status": "approved",
-      "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.sog",
+      "thumbnail_url": "mem-02.jpg",
+      "splat_url": "mem-02.sog",
       "captured_at": "2026-06-02T21:59:01Z",
       "geo": {
         "lat": 0,
@@ -70,8 +70,8 @@
     {
       "id": "mem-03",
       "status": "approved",
-      "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.sog",
+      "thumbnail_url": "mem-03.jpg",
+      "splat_url": "mem-03.sog",
       "captured_at": "2026-06-02T21:59:01Z",
       "geo": {
         "lat": 0,
@@ -101,8 +101,8 @@
     {
       "id": "mem-04",
       "status": "approved",
-      "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.sog",
+      "thumbnail_url": "mem-04.jpg",
+      "splat_url": "mem-04.sog",
       "captured_at": "2026-06-02T21:59:01Z",
       "geo": {
         "lat": 0,
@@ -132,8 +132,8 @@
     {
       "id": "mem-05",
       "status": "approved",
-      "thumbnail_url": "photo_2026-06-02_21-59-01.jpg",
-      "splat_url": "photo_2026-06-02_21-59-01.sog",
+      "thumbnail_url": "mem-05.jpg",
+      "splat_url": "mem-05.sog",
       "captured_at": "2026-06-02T21:59:01Z",
       "geo": {
         "lat": 0,
@@ -151,6 +151,37 @@
           -0.38268343,
           0,
           0.92387953
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "created_at": "2026-06-02T22:00:00Z"
+    },
+    {
+      "id": "mem-06",
+      "status": "approved",
+      "thumbnail_url": "mem-06.jpg",
+      "splat_url": "mem-06.sog",
+      "captured_at": "2026-06-02T21:59:01Z",
+      "geo": {
+        "lat": 0,
+        "lon": 0
+      },
+      "heading_deg": 135,
+      "transform": {
+        "position": [
+          45,
+          0,
+          35
+        ],
+        "quaternion": [
+          0,
+          0.92387953,
+          0,
+          0.38268343
         ],
         "scale": [
           1,

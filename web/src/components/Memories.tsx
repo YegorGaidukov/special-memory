@@ -36,10 +36,12 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
   const previews = useRef<Map<string, THREE.Points>>(new Map());
   const splats = useRef<Map<string, SplatMesh>>(new Map());
   const sinceTick = useRef(0);
-  // In-progress point-cloud -> splat cross-dissolves, advanced every frame.
-  const fades = useRef<Map<string, { mesh: SplatMesh; points?: THREE.Points; t: number }>>(
-    new Map(),
-  );
+  // In-progress cross-dissolves, advanced every frame. `dir` is +1 fading the
+  // splat in (ghost out) or -1 fading it out (ghost back in); a completed
+  // out-fade disposes the splat. `t` is the splat's presence, 0 (ghost) -> 1.
+  const fades = useRef<
+    Map<string, { mesh: SplatMesh; points?: THREE.Points; t: number; dir: 1 | -1 }>
+  >(new Map());
 
   // Build the SparkRenderer + load a point-cloud preview per memory.
   useEffect(() => {
@@ -98,17 +100,29 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
 
     // Every frame: advance any point-cloud -> splat cross-dissolves.
     if (fades.current.size > 0) {
+      const step = (delta * 1000) / PREVIEW.fadeMs;
       for (const [id, f] of fades.current) {
-        f.t = Math.min(1, f.t + (delta * 1000) / PREVIEW.fadeMs);
+        f.t = Math.max(0, Math.min(1, f.t + f.dir * step));
         const k = f.t * f.t * (3 - 2 * f.t); // smoothstep ease
         f.mesh.opacity = k;
         if (f.points) (f.points.material as THREE.PointsMaterial).opacity = 1 - k;
-        if (f.t >= 1) {
+        if (f.dir === 1 && f.t >= 1) {
+          // Faded in: splat fully shown, ghost hidden and reset for reuse.
           f.mesh.opacity = 1;
           if (f.points) {
             f.points.visible = false;
-            (f.points.material as THREE.PointsMaterial).opacity = 1; // reset for reuse
+            (f.points.material as THREE.PointsMaterial).opacity = 1;
           }
+          fades.current.delete(id);
+        } else if (f.dir === -1 && f.t <= 0) {
+          // Faded out: ghost fully back at full opacity, now dispose the splat.
+          if (f.points) {
+            f.points.visible = true;
+            (f.points.material as THREE.PointsMaterial).opacity = 1;
+          }
+          splats.current.delete(id);
+          scene.remove(f.mesh);
+          f.mesh.dispose();
           fades.current.delete(id);
         }
       }
@@ -120,16 +134,29 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
     sinceTick.current = 0;
 
     const camPos: Vec3 = [camera.position.x, camera.position.y, camera.position.z];
-    const { toLoad, toUnload } = decideLod(
-      records,
-      camPos,
-      new Set(splats.current.keys()),
-      LOD,
+    // A splat mid out-fade counts as "not resident", so a camera that turns back
+    // reverses its fade (reusing the mesh, below) instead of disposing+reloading.
+    const resident = new Set(
+      [...splats.current.keys()].filter((id) => fades.current.get(id)?.dir !== -1),
     );
+    const { toLoad, toUnload } = decideLod(records, camPos, resident, LOD);
 
     for (const id of toLoad) {
       const r = records.find((x) => x.id === id);
-      if (!r || splats.current.has(id)) continue;
+      if (!r) continue;
+
+      // Already have a mesh (it was fading out) — reverse it back in, reusing it.
+      const existing = splats.current.get(id);
+      if (existing) {
+        const f = fades.current.get(id);
+        fades.current.set(id, {
+          mesh: existing,
+          points: previews.current.get(id),
+          t: f ? f.t : 0,
+          dir: 1,
+        });
+        continue;
+      }
 
       const { position, rotation, scale } = toSplatSceneArgs(r);
       const mesh = new SplatMesh({
@@ -147,7 +174,7 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
           // Cross-dissolve the point cloud into the splat — but only if this mesh
           // is still the resident one (it may have been disposed mid-load).
           if (splats.current.get(id) !== mesh) return;
-          fades.current.set(id, { mesh, points: previews.current.get(id), t: 0 });
+          fades.current.set(id, { mesh, points: previews.current.get(id), t: 0, dir: 1 });
         })
         .catch((err) => {
           if (splats.current.get(id) !== mesh) return; // disposed mid-load
@@ -161,16 +188,20 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
     for (const id of toUnload) {
       const mesh = splats.current.get(id);
       if (!mesh) continue;
-      fades.current.delete(id); // cancel an in-flight cross-dissolve
-      splats.current.delete(id);
-      scene.remove(mesh);
-      mesh.dispose();
-      const ghost = previews.current.get(id);
-      if (ghost) {
-        // Fall back to the point cloud at full opacity.
-        (ghost.material as THREE.PointsMaterial).opacity = 1;
-        ghost.visible = true;
+      const f = fades.current.get(id);
+      // Never faded in (still loading) — nothing on screen to dissolve, so
+      // dispose now; its `initialized` handler sees it's gone and bails.
+      if (!f && mesh.opacity === 0) {
+        splats.current.delete(id);
+        scene.remove(mesh);
+        mesh.dispose();
+        continue;
       }
+      // Otherwise cross-dissolve back into the ghost (reverse of the load fade);
+      // the frame loop disposes the mesh once the out-fade reaches t <= 0.
+      const ghost = previews.current.get(id);
+      if (ghost) ghost.visible = true;
+      fades.current.set(id, { mesh, points: ghost, t: f ? f.t : 1, dir: -1 });
     }
   });
 

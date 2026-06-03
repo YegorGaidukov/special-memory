@@ -26,10 +26,10 @@ cp samples/output/thumbs/*.jpg web/public/memories/
 cd web && npm run convert-splats
 ```
 
-The current `manifest.json` seeds **5 memories** that all reference the same sample
-splat/thumbnail (`photo_2026-06-02_21-59-01.{ply,jpg}`) at offset positions and yaw
-rotations — enough to exercise multi-placement, LOD load/dispose, and click-to-travel
-without re-running the GPU.
+The current `manifest.json` seeds **6 distinct memories** (`mem-01`…`mem-06`), each
+with its own SHARP-reconstructed splat/thumbnail, spread across offset positions and
+yaw rotations — exercising multi-placement, LOD load/dispose, and click-to-travel with
+real per-memory geometry.
 
 ## Manifest shape (the explorer's input contract)
 

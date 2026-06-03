@@ -61,7 +61,7 @@ export default function SplatWorld() {
         <color attach="background" args={["#05060a"]} />
         <ContextLossLogger />
         {m.status === "ready" && <Memories records={m.manifest.memories} />}
-        <FreeFly records={records} speed={25} onArrive={setCurrent} />
+        <FreeFly records={records} onArrive={setCurrent} />
       </Canvas>
       <Crosshair />
       <TravelOverlay

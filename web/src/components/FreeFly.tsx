@@ -8,7 +8,7 @@ import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
 import { pickMemory } from "@/lib/camera/pick";
 import { framePoseForRecord } from "@/lib/camera/frame";
 import { makeFlyTo, type FlySample } from "@/lib/camera/flyTo";
-import { FLY_TO_DURATION_MS, FLY_TO_STANDOFF, PICK } from "@/config/explorer";
+import { FLY, FLY_TO_DURATION_MS, FLY_TO_STANDOFF, PICK } from "@/config/explorer";
 
 // Mouse-look (pointer lock) + WASD movement that follows the view direction.
 // Click while locked to travel to the memory you're aiming at; pressing a
@@ -26,7 +26,7 @@ const MOVE: Record<string, "fwd" | "back" | "left" | "right"> = {
 
 export default function FreeFly({
   records,
-  speed = 25,
+  speed = FLY.baseSpeed,
   onArrive,
 }: {
   records: MemoryRecord[];
@@ -36,6 +36,7 @@ export default function FreeFly({
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const pressed = useRef<Set<string>>(new Set());
+  const boosting = useRef(false);
 
   // Active travel: an eased fly-to function + elapsed time, or null when free.
   const fly = useRef<((elapsedMs: number) => FlySample) | null>(null);
@@ -50,13 +51,20 @@ export default function FreeFly({
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (e.key === "Shift") boosting.current = true;
       if (MOVE[e.code]) {
         pressed.current.add(e.code);
         fly.current = null; // user takes manual control -> cancel travel
       }
     };
-    const up = (e: KeyboardEvent) => pressed.current.delete(e.code);
-    const clear = () => pressed.current.clear();
+    const up = (e: KeyboardEvent) => {
+      if (e.key === "Shift") boosting.current = false;
+      pressed.current.delete(e.code);
+    };
+    const clear = () => {
+      pressed.current.clear();
+      boosting.current = false;
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", clear);
@@ -130,7 +138,8 @@ export default function FreeFly({
       else if (dir === "left") move.sub(right);
     }
     if (move.lengthSq() > 0) {
-      move.normalize().multiplyScalar(speed * delta);
+      const v = boosting.current ? speed * FLY.boost : speed;
+      move.normalize().multiplyScalar(v * delta);
       camera.position.add(move);
     }
   });
