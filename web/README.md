@@ -152,16 +152,19 @@ The curator-facing front door that feeds the explorer. The chosen city is
    calls SHARP — the filesystem is the bridge.
 4. **Ingest + approve** (`/admin`) — *Ingest splat* scans `public/memories` for
    `<id>.sog` and flips the record to `ready`; *Approve* sets it `approved` and
-   **republishes** `public/memories/manifest.json`. Only approved records are
-   published, so they then appear in the explorer at their real location.
+   **republishes** `public/memories/manifest.json` — **merging** the store's
+   approved records with any hand-authored entries already in the manifest (so
+   approving a contribution never wipes curated seed memories). The memory then
+   appears in the explorer at its real location.
 
 **Data & architecture:**
 
 - State is a single JSON **store** at `data/memories.json` (git-ignored), holding
   the full lifecycle (`uploaded → processing → ready → approved`). The explorer's
-  `manifest.json` is a *published projection* of the approved subset
-  (`server/publish.ts`), so S2's strict parser/renderer is never fed in-progress
-  records.
+  `manifest.json` is published by `server/publish.ts`: `mergeManifest` keeps any
+  hand-authored entries (curated seeds, by id) and layers the store's *approved*
+  records on top, so S2's strict parser/renderer is never fed in-progress records
+  and curated seeds survive each publish.
 - **S3 owns the geo math S2 omits.** `lib/geo/project.ts` (equirectangular
   lat/lon → local metres, East=+X / North=−Z), `lib/geo/heading.ts`
   (heading → yaw quaternion, matching the seed convention), and

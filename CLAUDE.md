@@ -62,9 +62,10 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   the stored `transform` (equirectangular projection about the Wolfsburg origin; heading→yaw
   quaternion matching the seed convention; all pure + unit-tested). State lives in a server-side
   JSON **store** (`web/data/memories.json`, git-ignored) holding the full lifecycle
-  (`uploaded → processing → ready → approved`); a pure **publish** step
-  (`server/publish.toExplorerManifest`) projects only `approved` records into the explorer's
-  `public/memories/manifest.json`, so the verified S2 parser/renderer is untouched. **SHARP stays
+  (`uploaded → processing → ready → approved`); a pure **publish** step (`server/publish.ts`,
+  `mergeManifest`) layers the store's `approved` records on top of any hand-authored manifest
+  entries (curated seeds, kept by id) and writes `public/memories/manifest.json`, so the verified S2
+  parser/renderer is untouched and curated seeds survive each publish. **SHARP stays
   out of the web process** — the bridge is the filesystem: upload copies the image to `RECON_INBOX`,
   the curator runs `python -m pipeline` + `npm run convert-splats` **manually** on the GPU box and
   drops `<id>.sog` into `public/memories/`, then `ingest` scans for it and flips the record to
