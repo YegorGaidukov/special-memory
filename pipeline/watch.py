@@ -115,10 +115,23 @@ def process_one(
                 str(out_dir / "thumbs" / f"{id}.jpg"),
                 str(Path(public_dir) / f"{id}.jpg"),
             )
-        on_ready(id)
     except Exception as e:  # GPU/convert/copy failure -> mark failed, quarantine input
-        on_fail(id, str(e))
-        move_to_failed(image_path, inbox)
+        try:
+            on_fail(id, str(e))
+        except Exception as notify_err:
+            print(f"[watch] WARNING: could not notify fail for {id}: {notify_err}")
+        try:
+            move_to_failed(image_path, inbox)
+        except Exception as move_err:
+            print(f"[watch] WARNING: could not quarantine {id}: {move_err}")
+        return
+    # Assets are committed to public_dir. A ready-notify failure here is only a
+    # notification glitch, not a reconstruction failure — log it and leave the
+    # record for the curator to ingest from /admin; do NOT mark it failed.
+    try:
+        on_ready(id)
+    except Exception as notify_err:
+        print(f"[watch] WARNING: {id} reconstructed but ready-notify failed: {notify_err}")
 
 
 def main():

@@ -69,3 +69,37 @@ def test_process_one_failure_quarantines_and_reports(tmp_path):
     assert "sharp exploded" in failed[0][1]
     assert not img.exists()                          # moved out of the inbox
     assert (inbox / "failed" / "mem-2.jpg").exists()
+
+
+def test_process_one_ready_notify_failure_does_not_mark_failed(tmp_path):
+    public = tmp_path / "public"; public.mkdir()
+    inbox = tmp_path / "inbox"; inbox.mkdir()
+    img = inbox / "mem-3.jpg"; img.write_bytes(b"jpeg")
+
+    def fake_reconstruct(in_dir, out_dir):
+        (Path(out_dir) / "splats").mkdir(parents=True)
+        (Path(out_dir) / "splats" / "mem-3.ply").write_text("ply")
+        (Path(out_dir) / "thumbs").mkdir(parents=True)
+        (Path(out_dir) / "thumbs" / "mem-3.jpg").write_text("thumb")
+
+    def fake_convert(splats_dir, public_dir):
+        (Path(public_dir) / "mem-3.sog").write_text("sog")
+
+    def boom_ready(i):
+        raise RuntimeError("ingest endpoint down")
+
+    failed = []
+    # A ready-notify failure after assets are committed must NOT mark the record
+    # failed, must NOT quarantine the image, and must NOT raise out of process_one.
+    process_one(
+        "mem-3", img,
+        public_dir=public, inbox=inbox, base_url="http://x",
+        reconstruct=fake_reconstruct, convert=fake_convert,
+        on_ready=boom_ready,
+        on_fail=lambda i, e: failed.append((i, e)),
+    )
+
+    assert (public / "mem-3.sog").exists()   # reconstruction succeeded
+    assert failed == []                       # not marked failed
+    assert img.exists()                       # not quarantined
+    assert not (inbox / "failed" / "mem-3.jpg").exists()
