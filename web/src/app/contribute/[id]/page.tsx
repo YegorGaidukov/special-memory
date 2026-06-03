@@ -30,6 +30,21 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
       .catch((e) => setError(String(e.message ?? e)));
   }, [id]);
 
+  // While reconstruction is in flight, poll so the page advances to "ready"
+  // (3D editor unlocks) or "failed" without a manual refresh.
+  useEffect(() => {
+    const status = record?.status;
+    if (status !== "processing" && status !== "uploaded") return;
+    const t = setInterval(async () => {
+      const r = await fetch(`/api/memories/${id}`);
+      if (r.ok) {
+        const d = await r.json();
+        setRecord(d.record);
+      }
+    }, 3000);
+    return () => clearInterval(t);
+  }, [id, record?.status]);
+
   async function save(p: Placement) {
     const r = await fetch(`/api/memories/${id}`, {
       method: "PATCH",
@@ -84,17 +99,22 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
           </p>
           <MemoryEditor3D record={record} />
         </section>
+      ) : record.status === "failed" ? (
+        <p className={styles.locked}>
+          Reconstruction failed{record.error ? `: ${record.error}` : ""}. Re-drop the
+          photo on the explorer to try again.
+        </p>
       ) : (
         <p className={styles.locked}>
-          3D placement unlocks once the splat is ingested (status “ready”).
+          Reconstructing your memory… the 3D editor unlocks automatically when it&rsquo;s ready.
         </p>
       )}
       {done && (
         <div className={styles.note}>
-          <span className={styles.noteTitle}>✓ Saved</span>
+          <span className={styles.noteTitle}>✓ Placement saved</span>
           <span>
-            Next: run SHARP on the inbox image, drop <code className={styles.code}>{record.id}.sog</code>{" "}
-            into public/memories, then ingest + approve in{" "}
+            Reconstruction runs automatically — this page unlocks the 3D fine-tune once
+            the splat is ready. You can also review everything in{" "}
             <button className={styles.link} onClick={() => router.push("/admin")}>
               the review queue
             </button>
