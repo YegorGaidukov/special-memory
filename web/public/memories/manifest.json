@@ -1,8 +1,8 @@
 {
   "city": {
-    "name": "Demo City",
-    "origin_lat": 0,
-    "origin_lon": 0
+    "name": "Wolfsburg",
+    "origin_lat": 52.4227,
+    "origin_lon": 10.7865
   },
   "memories": [
     {

@@ -31,3 +31,12 @@ export const FLY_TO_STANDOFF = 12; // metres from a memory when arriving
 
 // "Look at it and click" selection: cone half-angle + max range.
 export const PICK = { maxAngleRad: 0.4, maxDist: 1000 } as const;
+
+// The one chosen city. Origin is Wolfsburg city centre (Rathaus); geo placement
+// (S3) projects each memory's lat/lon to local metres relative to this point.
+// Shared by the contribution flow and written into the explorer manifest.
+export const CITY = {
+  name: "Wolfsburg",
+  origin_lat: 52.4227,
+  origin_lon: 10.7865,
+} as const;
