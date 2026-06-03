@@ -15,12 +15,15 @@ collective memory — dense where remembered, dreamlike at the edges.
 - S1 implementation plan: `docs/superpowers/plans/2026-06-02-s1-reconstruction-pipeline.md`
 - S2 explorer docs: `web/README.md` (setup, run, controls, architecture, deferrals)
 
-**Current state:** **S1 (Python pipeline) and S2 (web explorer) are both built and unit-tested.**
+**Current state:** **S1, S2, and S3 are all built and unit-tested.**
 S1 is validated end-to-end on the laptop GPU (`pipeline/` + `tests/`; see `samples/README.md`).
-S2 lives in `web/` (Next.js + R3F + SHARP splats; 48 Vitest specs); it renders the dark void,
-loads the seed memories upright, and supports free-fly + click-to-travel — **verify on a
+S2 lives in `web/` (Next.js + R3F + Spark splats); it renders the dark void, loads the seed
+memories upright, and supports free-fly + click-to-travel. S3 (also in `web/`) adds the contribution
+flow: upload → EXIF auto-placement → MapLibre pin/heading/scale → manual SHARP run → ingest →
+approve → publish. The web suite is **92 Vitest specs** (pure geo/manifest/store/publish/exif logic;
+the WebGL viewer, MapLibre canvas, and route handlers are the mocked/manual seams). **Verify on a
 production build** (`npm run build && npm run start`), not dev (HMR remounts the WebGL viewer and
-throws spurious errors). **S3 is not started.** Build order is **S1 → S2 → S3** (below).
+throws spurious errors). Build order was **S1 → S2 → S3**.
 
 ## Architecture (big picture)
 
@@ -52,8 +55,24 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   back to the point cloud past `disposeRadius` (Spark's race-free `initialized`/`dispose` lifecycle
   drives this from the tested `decideLod` in `src/lib/lod/`). Spark does the global splat sort.
   **Deferred:** the starfield/grid, and Spark's built-in per-splat LOD (not needed yet).
-- **S3 — Contribution (web).** Upload form → EXIF parse → MapLibre map pin + facing-arrow placement
-  → enqueue to S1 → approve flag → memory appears in the explorer.
+- **S3 — Contribution (web). [BUILT]** The contribution flow in `web/`: a curator uploads a photo
+  (`/contribute`), EXIF GPS auto-drops a MapLibre pin (`/contribute/[id]`) that they drag + set a
+  facing-heading + scale on, then review/ingest/approve in `/admin`. **S3 owns the geo math S2
+  deliberately omits** — `lib/geo/{project,heading,transform}` turns lat/lon + heading + scale into
+  the stored `transform` (equirectangular projection about the Wolfsburg origin; heading→yaw
+  quaternion matching the seed convention; all pure + unit-tested). State lives in a server-side
+  JSON **store** (`web/data/memories.json`, git-ignored) holding the full lifecycle
+  (`uploaded → processing → ready → approved`); a pure **publish** step
+  (`server/publish.toExplorerManifest`) projects only `approved` records into the explorer's
+  `public/memories/manifest.json`, so the verified S2 parser/renderer is untouched. **SHARP stays
+  out of the web process** — the bridge is the filesystem: upload copies the image to `RECON_INBOX`,
+  the curator runs `python -m pipeline` + `npm run convert-splats` **manually** on the GPU box and
+  drops `<id>.sog` into `public/memories/`, then `ingest` scans for it and flips the record to
+  `ready`. Next.js 16 Route Handlers (`app/api/memories/**`) wire it together; the routes + MapLibre
+  canvas are the manual/seam-tested boundaries (a headless backend smoke test covers
+  upload→place→ingest→approve→publish). The city is **Wolfsburg** (`config/explorer.CITY`, origin
+  52.4227, 10.7865). **No authentication** — curated, locally-run installation, so the
+  contribution/admin routes are open by design.
 
 **Memory record (the contract between subsystems):** `id, status, source_image, splat_path,
 thumbnail_path, captured_at, geo{lat,lon}, heading_deg, transform{position[x,y,z], quaternion,

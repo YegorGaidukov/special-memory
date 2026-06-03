@@ -130,3 +130,70 @@ memories on the laptop and the exhibition machine alike:
 - **Spark's built-in per-splat LOD** (`SplatMesh({ lod })`) — not needed yet;
   our distance residency is the primary lever. Worth evaluating if individual
   resident splats ever become the bottleneck.
+
+## S3 — Contribution flow
+
+The curator-facing front door that feeds the explorer. The chosen city is
+**Wolfsburg** (origin 52.4227, 10.7865, in `config/explorer.ts` `CITY`).
+
+**The lifecycle:**
+
+1. **Upload** (`/contribute`) — choose a city photo. The server saves the
+   original under `data/uploads/`, copies it to the recon inbox (`RECON_INBOX`,
+   default `data/inbox/`) for the manual SHARP run, parses EXIF GPS/capture-time,
+   and creates an `uploaded` record.
+2. **Place** (`/contribute/[id]`) — a MapLibre map (key-free OSM tiles) drops a
+   pin from the photo's GPS (or Wolfsburg centre if none); drag it, set a facing
+   **heading** and a **scale** nudge, save. The server runs the geo math
+   (`lib/geo/*`) to compute the stored `transform`.
+3. **Reconstruct (manual, on the GPU box)** — run `python -m pipeline -i <inbox>
+   -o <out>` then `npm run convert-splats`, and drop `<id>.sog` +
+   `<id>.preview.ply` + `<id>.jpg` into `public/memories/`. The web app never
+   calls SHARP — the filesystem is the bridge.
+4. **Ingest + approve** (`/admin`) — *Ingest splat* scans `public/memories` for
+   `<id>.sog` and flips the record to `ready`; *Approve* sets it `approved` and
+   **republishes** `public/memories/manifest.json`. Only approved records are
+   published, so they then appear in the explorer at their real location.
+
+**Data & architecture:**
+
+- State is a single JSON **store** at `data/memories.json` (git-ignored), holding
+  the full lifecycle (`uploaded → processing → ready → approved`). The explorer's
+  `manifest.json` is a *published projection* of the approved subset
+  (`server/publish.ts`), so S2's strict parser/renderer is never fed in-progress
+  records.
+- **S3 owns the geo math S2 omits.** `lib/geo/project.ts` (equirectangular
+  lat/lon → local metres, East=+X / North=−Z), `lib/geo/heading.ts`
+  (heading → yaw quaternion, matching the seed convention), and
+  `lib/geo/transform.ts` (compose into a `transform`) are pure and unit-tested.
+  `lib/exif/placement.ts` normalises exifr output; `server/{store,publish,ingest}`
+  hold pure ops behind thin fs seams. **The Route Handlers
+  (`app/api/memories/**`) and the MapLibre canvas are the seams** — verified by a
+  manual smoke test, not unit tests (mirroring S2's WebGL seam).
+- **No authentication** — this is a curated, locally-run installation, so the
+  contribution/admin routes and pages are intentionally open.
+
+**Config:** `RECON_INBOX` (where uploads are copied for SHARP; point it at S1's
+input folder on the exhibition machine) — see `.env.local.example`.
+
+### S3 smoke test (the spec's bar)
+
+> upload → EXIF placed → adjust → run SHARP → approve → appears at the right
+> place/orientation.
+
+The **backend** path (upload → place → ingest → approve → republish) is verified
+headlessly against a production build. The **browser** path needs a human:
+
+```bash
+npm run build && npm run start   # then open http://localhost:3000
+```
+
+- [ ] `/contribute` — upload a Wolfsburg photo (ideally one with GPS).
+- [ ] `/contribute/<id>` — the map shows a pin (auto-placed if the photo had GPS,
+      else Wolfsburg centre). Drag it, set heading + scale, **Save placement**.
+- [ ] Run SHARP on the inbox image + `npm run convert-splats`, drop `<id>.sog`
+      (+ `.preview.ply` + `.jpg`) into `public/memories/`. (To test the flow
+      without a GPU, copy an existing seed `.sog`/`.preview.ply`/`.jpg` to those
+      names.)
+- [ ] `/admin` — **Ingest splat** → `ready`; **Approve** → `approved`.
+- [ ] `/` — the new memory renders at its Wolfsburg location/orientation.
