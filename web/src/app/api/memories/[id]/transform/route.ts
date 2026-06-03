@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { loadStore, saveStore, updateRecord, findById } from "@/server/store";
-import { publishManifest } from "@/server/publish";
+import { publishManifest, patchPublishedTransform } from "@/server/publish";
 import { isValidTransform } from "@/lib/transform/validate";
 import { CITY } from "@/config/explorer";
 import type { ContribRecord } from "@/server/types";
@@ -28,18 +28,25 @@ export async function PATCH(
 
   const store = await loadStore();
   const record = findById(store, id);
-  if (!record) return new Response("not found", { status: 404 });
 
-  const patch: Partial<ContribRecord> = { transform: body.transform };
-  const next = updateRecord(store, id, patch);
-  await saveStore(next);
-
-  if (record.status === "approved") {
-    await publishManifest(next, {
-      name: CITY.name,
-      origin_lat: CITY.origin_lat,
-      origin_lon: CITY.origin_lon,
-    });
+  // Store-managed (S3-contributed) memory: the store is the source of truth.
+  if (record) {
+    const patch: Partial<ContribRecord> = { transform: body.transform };
+    const next = updateRecord(store, id, patch);
+    await saveStore(next);
+    if (record.status === "approved") {
+      await publishManifest(next, {
+        name: CITY.name,
+        origin_lat: CITY.origin_lat,
+        origin_lon: CITY.origin_lon,
+      });
+    }
+    return Response.json({ record: findById(next, id) });
   }
-  return Response.json({ record: findById(next, id) });
+
+  // Not in the store: a hand-authored seed memory that lives only in the
+  // published manifest — patch its transform there directly.
+  const patched = await patchPublishedTransform(id, body.transform);
+  if (!patched) return new Response("not found", { status: 404 });
+  return Response.json({ record: { id, transform: body.transform } });
 }
