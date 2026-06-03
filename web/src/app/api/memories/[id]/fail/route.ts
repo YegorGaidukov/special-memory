@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/memories/[i
   let error = "reconstruction failed";
   try {
     const body = await req.json();
-    if (body && typeof body.error === "string") error = body.error;
+    if (body && typeof body.error === "string" && body.error.trim().length > 0) error = body.error;
   } catch {
     // empty/invalid body → keep the default message
   }
