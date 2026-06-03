@@ -28,7 +28,12 @@ interface PlacementBody {
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/memories/[id]">) {
   const { id } = await ctx.params;
 
-  const body = (await request.json()) as Partial<PlacementBody>;
+  let body: Partial<PlacementBody>;
+  try {
+    body = (await request.json()) as Partial<PlacementBody>;
+  } catch {
+    return new Response("invalid JSON body", { status: 400 });
+  }
   const { lat, lon, heading_deg } = body;
   if (![lat, lon, heading_deg].every((n) => typeof n === "number" && Number.isFinite(n))) {
     return new Response("lat, lon, heading_deg must be finite numbers", { status: 400 });
