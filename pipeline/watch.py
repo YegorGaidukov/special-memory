@@ -9,8 +9,12 @@ API to flip the record to `ready` (or `failed`). The web process never runs SHAR
 Usage (in the `sharp` env):
     python -m pipeline.watch
 
+The web app's port is auto-discovered (Next bumps 3000 -> 3001 when busy), so the
+watcher finds it whether you're on 3000 or 3001. Set WEB_BASE_URL to override (e.g.
+a remote/exhibition box).
+
 Config via env:
-    WEB_BASE_URL        default http://localhost:3000
+    WEB_BASE_URL        override; default = auto-probe localhost:3000-3003
     WATCH_INTERVAL_SEC  default 3
     RECON_INBOX         default <repo>/web/data/inbox
     PUBLIC_MEMORIES_DIR default <repo>/web/public/memories
@@ -62,6 +66,53 @@ def run_convert(splats_dir, public_dir):
         ["node", str(CONVERT_SCRIPT), str(splats_dir), str(public_dir)],
         check=True,
     )
+
+
+def candidate_ports(env=None):
+    """Ports to probe for the running web app, in order. An explicit dev `PORT`
+    (Next bumps to 3001/3002 when 3000 is taken) is tried first, then the usual
+    Next dev/start range."""
+    env = os.environ if env is None else env
+    ports = []
+    p = env.get("PORT")
+    if p and p.isdigit():
+        ports.append(int(p))
+    for d in (3000, 3001, 3002, 3003):
+        if d not in ports:
+            ports.append(d)
+    return ports
+
+
+def _probe_api(base_url):
+    """True if base_url serves our memories API (GET returns a store with records).
+    Validating the body shape avoids latching onto an unrelated app on the port."""
+    try:
+        with urllib.request.urlopen(f"{base_url}/api/memories", timeout=2) as r:
+            if r.status != 200:
+                return False
+            body = json.loads(r.read().decode())
+        return isinstance(body, dict) and isinstance(body.get("records"), list)
+    except Exception:
+        return False
+
+
+def resolve_base_url(env=None, probe=None):
+    """Figure out where the web app is listening. `WEB_BASE_URL` wins if set
+    (remote/exhibition box); otherwise probe localhost across `candidate_ports`
+    and use the first that actually serves our API. Falls back to the first
+    candidate if none answer (callbacks then fail-soft and the curator can ingest
+    from /admin)."""
+    env = os.environ if env is None else env
+    explicit = env.get("WEB_BASE_URL")
+    if explicit:
+        return explicit
+    probe = probe or _probe_api
+    ports = candidate_ports(env)
+    for port in ports:
+        url = f"http://localhost:{port}"
+        if probe(url):
+            return url
+    return f"http://localhost:{ports[0]}"
 
 
 def post_json(url, payload=None):
@@ -135,7 +186,7 @@ def process_one(
 
 
 def main():
-    base_url = os.environ.get("WEB_BASE_URL", "http://localhost:3000")
+    base_url = resolve_base_url()
     interval = float(os.environ.get("WATCH_INTERVAL_SEC", "3"))
     inbox = Path(os.environ.get("RECON_INBOX") or REPO_ROOT / "web" / "data" / "inbox")
     public_dir = Path(

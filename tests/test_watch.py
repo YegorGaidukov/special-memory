@@ -103,3 +103,34 @@ def test_process_one_ready_notify_failure_does_not_mark_failed(tmp_path):
     assert failed == []                       # not marked failed
     assert img.exists()                       # not quarantined
     assert not (inbox / "failed" / "mem-3.jpg").exists()
+
+
+from pipeline.watch import resolve_base_url, candidate_ports
+
+
+def test_candidate_ports_defaults_to_the_dev_server_range():
+    assert candidate_ports({}) == [3000, 3001, 3002, 3003]
+
+
+def test_candidate_ports_tries_PORT_env_first():
+    # If the curator set an explicit dev PORT, probe it before the defaults.
+    assert candidate_ports({"PORT": "3001"}) == [3001, 3000, 3002, 3003]
+
+
+def test_resolve_base_url_explicit_override_skips_probing():
+    def probe(_url):
+        raise AssertionError("must not probe when WEB_BASE_URL is set")
+    assert resolve_base_url({"WEB_BASE_URL": "http://box:9999"}, probe=probe) == "http://box:9999"
+
+
+def test_resolve_base_url_picks_first_port_serving_our_api():
+    tried = []
+    def probe(url):
+        tried.append(url)
+        return url == "http://localhost:3001"  # 3000 is some other app
+    assert resolve_base_url({}, probe=probe) == "http://localhost:3001"
+    assert tried == ["http://localhost:3000", "http://localhost:3001"]
+
+
+def test_resolve_base_url_falls_back_to_first_candidate_when_none_answer():
+    assert resolve_base_url({}, probe=lambda _url: False) == "http://localhost:3000"
