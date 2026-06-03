@@ -19,8 +19,8 @@ collective memory — dense where remembered, dreamlike at the edges.
 S1 is validated end-to-end on the laptop GPU (`pipeline/` + `tests/`; see `samples/README.md`).
 S2 lives in `web/` (Next.js + R3F + Spark splats); it renders the dark void, loads the seed
 memories upright, and supports free-fly + click-to-travel. S3 (also in `web/`) adds the contribution
-flow: upload → EXIF auto-placement → MapLibre pin/heading/scale → manual SHARP run → ingest →
-approve → publish. The web suite is **92 Vitest specs** (pure geo/manifest/store/publish/exif logic;
+flow: upload → EXIF auto-placement → MapLibre pin/heading/scale → auto-reconstruct (watcher) →
+ingest → approve → publish. The web suite is **92 Vitest specs** (pure geo/manifest/store/publish/exif logic;
 the WebGL viewer, MapLibre canvas, and route handlers are the mocked/manual seams). **Verify on a
 production build** (`npm run build && npm run start`), not dev (HMR remounts the WebGL viewer and
 throws spurious errors). Build order was **S1 → S2 → S3**.
@@ -66,10 +66,12 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   `mergeManifest`) layers the store's `approved` records on top of any hand-authored manifest
   entries (curated seeds, kept by id) and writes `public/memories/manifest.json`, so the verified S2
   parser/renderer is untouched and curated seeds survive each publish. **SHARP stays
-  out of the web process** — the bridge is the filesystem: upload copies the image to `RECON_INBOX`,
-  the curator runs `python -m pipeline` + `npm run convert-splats` **manually** on the GPU box and
-  drops `<id>.sog` into `public/memories/`, then `ingest` scans for it and flips the record to
-  `ready`. Next.js 16 Route Handlers (`app/api/memories/**`) wire it together; the routes + MapLibre
+  out of the web process** — the bridge is the filesystem: a drop copies the image to `RECON_INBOX`
+  and marks the record `processing`, then a **watcher the curator runs on the GPU box**
+  (`python -m pipeline.watch`, in the `sharp` env) reconstructs it, runs `convert-splats`, drops
+  `<id>.sog` into `public/memories/`, and calls the `ingest` API to flip the record to `ready`
+  (or the `fail` API on error). The web process still never runs SHARP.
+  Next.js 16 Route Handlers (`app/api/memories/**`) wire it together; the routes + MapLibre
   canvas are the manual/seam-tested boundaries (a headless backend smoke test covers
   upload→place→ingest→approve→publish). The city is **Wolfsburg** (`config/explorer.CITY`, origin
   52.4227, 10.7865). **No authentication** — curated, locally-run installation, so the
@@ -122,6 +124,10 @@ pip install --index-url https://download.pytorch.org/whl/cu128 --force-reinstall
 # Run the reconstruction pipeline (needs `sharp` on PATH → activate the env first)
 conda activate sharp
 python -m pipeline -i samples\input -o samples\output
+
+# Auto-reconstruct dropped photos: watch the web inbox and process new uploads
+# (run on the GPU box, in the `sharp` env; needs the web app running for the callbacks)
+python -m pipeline.watch
 
 # Run SHARP directly
 sharp predict -i <input_image_dir> -o <output_dir>

@@ -144,18 +144,22 @@ The curator-facing front door that feeds the explorer. The chosen city is
 
 **The lifecycle:**
 
-1. **Upload** (`/contribute`) — choose a city photo. The server saves the
-   original under `data/uploads/`, copies it to the recon inbox (`RECON_INBOX`,
-   default `data/inbox/`) for the manual SHARP run, parses EXIF GPS/capture-time,
-   and creates an `uploaded` record.
+1. **Upload** (drop on the explorer) — drop a city photo onto the main view. The
+   server saves the original under `data/uploads/`, copies it to the recon inbox
+   (`RECON_INBOX`, default `data/inbox/`), parses EXIF GPS/capture-time, and
+   creates a `processing` record.
 2. **Place** (`/contribute/[id]`) — a MapLibre map (key-free OSM tiles) drops a
    pin from the photo's GPS (or Wolfsburg centre if none); drag it, set a facing
    **heading** and a **scale** nudge, save. The server runs the geo math
    (`lib/geo/*`) to compute the stored `transform`.
-3. **Reconstruct (manual, on the GPU box)** — run `python -m pipeline -i <inbox>
-   -o <out>` then `npm run convert-splats`, and drop `<id>.sog` +
-   `<id>.preview.ply` + `<id>.jpg` into `public/memories/`. The web app never
-   calls SHARP — the filesystem is the bridge.
+3. **Reconstruct (auto, GPU-side watcher)** — dropping a photo on the explorer
+   auto-starts reconstruction: the upload is marked `processing`, and the GPU-side
+   watcher (`python -m pipeline.watch`, started by the curator in the conda `sharp`
+   env) reconstructs it, converts it to `.sog`, drops the assets into
+   `public/memories/`, and calls the `ingest` API so the placement page unlocks the
+   3D editor automatically. On error the watcher calls the `fail` API and moves the
+   image to `data/inbox/failed/`; re-drop the photo to retry. The web process still
+   never runs SHARP.
 4. **Ingest + approve** (`/admin`) — *Ingest splat* scans `public/memories` for
    `<id>.sog` and flips the record to `ready`; *Approve* sets it `approved` and
    **republishes** `public/memories/manifest.json` — **merging** the store's
@@ -187,7 +191,7 @@ input folder on the exhibition machine) — see `.env.local.example`.
 
 ### S3 smoke test (the spec's bar)
 
-> upload → EXIF placed → adjust → run SHARP → approve → appears at the right
+> upload → EXIF placed → adjust → auto-reconstruct → approve → appears at the right
 > place/orientation.
 
 The **backend** path (upload → place → ingest → approve → republish) is verified
@@ -197,12 +201,12 @@ headlessly against a production build. The **browser** path needs a human:
 npm run build && npm run start   # then open http://localhost:3000
 ```
 
-- [ ] `/contribute` — upload a Wolfsburg photo (ideally one with GPS).
+- [ ] Drop a Wolfsburg photo onto the explorer (ideally one with GPS).
 - [ ] `/contribute/<id>` — the map shows a pin (auto-placed if the photo had GPS,
       else Wolfsburg centre). Drag it, set heading + scale, **Save placement**.
-- [ ] Run SHARP on the inbox image + `npm run convert-splats`, drop `<id>.sog`
-      (+ `.preview.ply` + `.jpg`) into `public/memories/`. (To test the flow
-      without a GPU, copy an existing seed `.sog`/`.preview.ply`/`.jpg` to those
-      names.)
+- [ ] Start the watcher (`python -m pipeline.watch`) on the GPU box; it will
+      reconstruct the inbox image and call `ingest` automatically. (To test the
+      flow without a GPU, manually copy an existing seed `.sog`/`.preview.ply`/`.jpg`
+      to `public/memories/<id>.*` and then `ingest` via `/admin`.)
 - [ ] `/admin` — **Ingest splat** → `ready`; **Approve** → `approved`.
 - [ ] `/` — the new memory renders at its Wolfsburg location/orientation.
