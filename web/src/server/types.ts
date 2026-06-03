@@ -8,6 +8,8 @@ import type { MemoryRecord } from "@/lib/manifest/types";
 export interface ContribRecord extends MemoryRecord {
   /** Filename of the stored original under UPLOADS_DIR (provenance + re-runs). */
   source_image: string;
+  /** Last reconstruction error, set when status is "failed" (watcher callback). */
+  error?: string;
 }
 
 export interface ContribStore {

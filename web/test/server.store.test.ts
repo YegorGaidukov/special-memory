@@ -49,4 +49,11 @@ describe("store ops", () => {
     updateRecord(s, "a", { status: "approved" });
     expect(findById(s, "a")?.status).toBe("uploaded");
   });
+
+  it("updateRecord can mark a record failed with an error message", () => {
+    const s = addRecord(emptyStore(), rec("a"));
+    const s2 = updateRecord(s, "a", { status: "failed", error: "sharp exploded" });
+    expect(findById(s2, "a")?.status).toBe("failed");
+    expect(findById(s2, "a")?.error).toBe("sharp exploded");
+  });
 });
