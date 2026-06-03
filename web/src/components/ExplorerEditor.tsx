@@ -30,8 +30,12 @@ export default function ExplorerEditor({
 }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
+  // `s.controls` is whatever called makeDefault. On entering edit mode it can
+  // briefly still be FreeFly's PointerLockControls (no `.target`) before drei's
+  // OrbitControls registers, so treat `target` as possibly-absent and re-run
+  // these effects once the real OrbitControls (which has it) takes over.
   const controls = useThree((s) => s.controls) as
-    | { target: THREE.Vector3; update: () => void }
+    | { target?: THREE.Vector3; update?: () => void }
     | null;
   const [mesh, setMesh] = useState<THREE.Object3D | null>(null);
 
@@ -72,7 +76,7 @@ export default function ExplorerEditor({
   // Center the orbit on a point ahead of the camera when edit mode opens, so the
   // first drag doesn't swing wildly around the world origin.
   useEffect(() => {
-    if (!controls) return;
+    if (!controls?.target) return;
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     controls.target.set(
@@ -80,19 +84,19 @@ export default function ExplorerEditor({
       camera.position.y + dir.y * 20,
       camera.position.z + dir.z * 20,
     );
-    controls.update();
+    controls.update?.();
   }, [controls, camera]);
 
   // Selection changed: drop the old mesh and recenter the orbit on the new one.
   useEffect(() => {
     setMesh(null);
     onTransformChange(null);
-    if (!controls || !selectedId) return;
+    if (!controls?.target || !selectedId) return;
     const rec = recordsRef.current.find((r) => r.id === selectedId);
     if (!rec) return;
     const p = rec.transform.position;
     controls.target.set(p[0], p[1], p[2]);
-    controls.update();
+    controls.update?.();
   }, [selectedId, controls, onTransformChange]);
 
   // Poll the registry until the selected memory's full splat is resident.
