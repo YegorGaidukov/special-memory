@@ -2,8 +2,15 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import PlacementMap, { type Placement } from "./PlacementMap";
 import type { ContribRecord } from "@/server/types";
+
+// WebGL/Spark editor — never server-render it (mirrors ExplorerCanvas).
+const MemoryEditor3D = dynamic(() => import("@/components/MemoryEditor3D"), {
+  ssr: false,
+  loading: () => <p style={{ color: "#9aa3b8" }}>Loading 3D editor…</p>,
+});
 
 export default function PlacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -54,6 +61,21 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
         }}
         onSave={save}
       />
+      {record.status === "ready" || record.status === "approved" ? (
+        <section style={{ display: "grid", gap: 8, marginTop: 8 }}>
+          <h2 style={{ fontSize: 18, margin: 0 }}>Fine-tune in 3D</h2>
+          <p style={{ color: "#9aa3b8", margin: 0 }}>
+            Drag the gizmo to place, rotate, and scale the splat directly. Saving here writes
+            the transform straight to the record (re-saving the map above recomputes it from the
+            pin).
+          </p>
+          <MemoryEditor3D record={record} />
+        </section>
+      ) : (
+        <p style={{ color: "#6b7488" }}>
+          3D placement unlocks once the splat is ingested (status “ready”).
+        </p>
+      )}
       {done && (
         <p style={{ color: "#80ff9f" }}>
           Saved. Next: run SHARP on the inbox image, drop <code>{record.id}.sog</code> into
