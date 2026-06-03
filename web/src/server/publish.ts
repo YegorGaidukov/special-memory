@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   CityConfig,
@@ -6,6 +6,7 @@ import type {
   MemoryRecord,
 } from "@/lib/manifest/types";
 import type { ContribStore } from "./types";
+import { parseManifest } from "@/lib/manifest/parse";
 import { PUBLIC_MEMORIES_DIR } from "./paths";
 
 // Curated gate: only approved memories reach the explorer (the spec's "approve
@@ -31,12 +32,38 @@ export function toExplorerManifest(
   };
 }
 
-/** fs seam: write the published manifest to public/memories/manifest.json. */
+/**
+ * Merge S3's published output with externally-authored manifest entries. Entries
+ * whose id is NOT managed by the S3 store (hand-curated seed memories) are
+ * preserved; the store's approved records are appended. Any stale entry for a
+ * store-managed id is dropped/replaced. This lets curated seed memories and S3
+ * contributions coexist in one published manifest instead of approve wiping the
+ * seed.
+ */
+export function mergeManifest(
+  existingMemories: MemoryRecord[],
+  store: ContribStore,
+  city: CityConfig,
+): ExplorerManifest {
+  const storeIds = new Set(store.records.map((r) => r.id));
+  const external = existingMemories.filter((m) => !storeIds.has(m.id));
+  const approved = toExplorerManifest(store, city).memories;
+  return { city, memories: [...external, ...approved] };
+}
+
+/** fs seam: merge with the on-disk manifest and write public/memories/manifest.json. */
 export async function publishManifest(
   store: ContribStore,
   city: CityConfig,
 ): Promise<void> {
-  const manifest = toExplorerManifest(store, city);
   const path = join(PUBLIC_MEMORIES_DIR, "manifest.json");
+  let existing: MemoryRecord[] = [];
+  try {
+    const raw = JSON.parse(await readFile(path, "utf8"));
+    existing = parseManifest(raw).memories;
+  } catch {
+    existing = []; // missing or unreadable manifest → nothing external to preserve
+  }
+  const manifest = mergeManifest(existing, store, city);
   await writeFile(path, JSON.stringify(manifest, null, 2));
 }
