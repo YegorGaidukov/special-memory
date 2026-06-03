@@ -43,6 +43,11 @@ yarn-error.log*
 /public/memories/*.jpeg
 /public/memories/*.png
 
+# S3 contribution runtime data: the record store + uploaded originals + recon
+# inbox are local state, not source. Keep the dir present via .gitkeep.
+/data/*
+!/data/.gitkeep
+
 # vercel
 .vercel
 
