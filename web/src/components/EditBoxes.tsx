@@ -1,6 +1,6 @@
 "use client";
 
-import { Segments, Segment } from "@react-three/drei";
+import { Line, Segments, Segment } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -8,8 +8,9 @@ import type { MemoryRecord } from "@/lib/manifest/types";
 import { toSplatSceneArgs } from "@/lib/transform/apply";
 import { getBounds, getResident } from "@/lib/splat/registry";
 
-// Fraction of each edge that a corner bracket extends along that edge.
-const BRACKET_FRAC = 0.2;
+// Fixed corner-bracket arm length (local units), independent of box size, but
+// clamped so it never exceeds ~half an edge on a small box.
+const BRACKET_LEN = 10.0;
 
 type Seg = [THREE.Vector3Tuple, THREE.Vector3Tuple];
 
@@ -17,9 +18,9 @@ type Seg = [THREE.Vector3Tuple, THREE.Vector3Tuple];
 // three edges that meet there.
 function bracketSegments(box: THREE.Box3): Seg[] {
   const { min, max } = box;
-  const sx = (max.x - min.x) * BRACKET_FRAC;
-  const sy = (max.y - min.y) * BRACKET_FRAC;
-  const sz = (max.z - min.z) * BRACKET_FRAC;
+  const sx = Math.min(BRACKET_LEN, (max.x - min.x) * 0.45);
+  const sy = Math.min(BRACKET_LEN, (max.y - min.y) * 0.45);
+  const sz = Math.min(BRACKET_LEN, (max.z - min.z) * 0.45);
   const segs: Seg[] = [];
   for (const x of [min.x, max.x])
     for (const y of [min.y, max.y])
@@ -34,34 +35,31 @@ function bracketSegments(box: THREE.Box3): Seg[] {
   return segs;
 }
 
-// Corner brackets for one memory's bounding box. The group carries the memory's
-// placement, so the brackets inherit its rotation/scale. The selected memory
-// mirrors its live (gizmo-driven) mesh each frame so the box tracks edits before
-// they're saved. Uses drei <Segments> (fat lines via LineMaterial), which are
-// shader-anti-aliased — the canvas runs antialias:false for splats, so plain GL
-// lines would be jagged.
-function CornerBox({
-  id,
-  box,
-  position,
-  quaternion,
-  scale,
-  selected,
-}: {
-  id: string;
-  box: THREE.Box3;
-  position: THREE.Vector3Tuple;
-  quaternion: [number, number, number, number];
-  scale: number;
-  selected: boolean;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
-  const segs = useMemo(() => bracketSegments(box), [box]);
-  const color = selected ? "#e6e9f0" : "#5b6b8c";
+// All 12 box edges as a flat list of endpoint pairs (for a <Line segments>).
+function boxEdges(box: THREE.Box3): THREE.Vector3Tuple[] {
+  const { min, max } = box;
+  const c: THREE.Vector3Tuple[] = [];
+  for (const z of [min.z, max.z])
+    for (const y of [min.y, max.y])
+      for (const x of [min.x, max.x]) c.push([x, y, z]); // index bits: x|y<<1|z<<2
+  const edges = [
+    [0, 1], [2, 3], [4, 5], [6, 7], // x
+    [0, 2], [1, 3], [4, 6], [5, 7], // y
+    [0, 4], [1, 5], [2, 6], [3, 7], // z
+  ];
+  const pts: THREE.Vector3Tuple[] = [];
+  for (const [i, j] of edges) {
+    pts.push(c[i], c[j]);
+  }
+  return pts;
+}
 
+// Mirror a memory's live (gizmo-driven) mesh each frame, so an edited box tracks
+// the splat before the edit is saved.
+function useLiveMirror(id: string, groupRef: React.RefObject<THREE.Group | null>) {
   useFrame(() => {
     const g = groupRef.current;
-    if (!g || !selected) return;
+    if (!g) return;
     const obj = getResident(id);
     if (obj) {
       g.position.copy(obj.position);
@@ -69,25 +67,78 @@ function CornerBox({
       g.scale.copy(obj.scale);
     }
   });
+}
 
+// Corner brackets for an UNSELECTED memory (drei <Segments>, shader-AA fat
+// lines). The group carries the memory's stored placement.
+function CornerBox({
+  box,
+  position,
+  quaternion,
+  scale,
+}: {
+  box: THREE.Box3;
+  position: THREE.Vector3Tuple;
+  quaternion: [number, number, number, number];
+  scale: number;
+}) {
+  const segs = useMemo(() => bracketSegments(box), [box]);
   return (
-    <group ref={groupRef} position={position} quaternion={quaternion} scale={scale}>
-      <Segments
-        lineWidth={selected ? 2 : 1.5}
-        transparent
-        opacity={selected ? 1 : 0.5}
-        depthTest={false}
-        toneMapped={false}
-      >
+    <group position={position} quaternion={quaternion} scale={scale}>
+      <Segments lineWidth={1.5} transparent opacity={0.5} depthTest={false} toneMapped={false}>
         {segs.map(([start, end], i) => (
-          <Segment key={i} start={start} end={end} color={color} />
+          <Segment key={i} start={start} end={end} color="#ffffff" />
         ))}
       </Segments>
     </group>
   );
 }
 
-/** Bounding-box corner brackets for every memory while edit mode is active. */
+// The SELECTED (editing) memory: full bounding-box edges drawn as a dashed line,
+// mirroring the live mesh so it tracks gizmo / numeric edits.
+function DashedBox({
+  id,
+  box,
+  position,
+  quaternion,
+  scale,
+}: {
+  id: string;
+  box: THREE.Box3;
+  position: THREE.Vector3Tuple;
+  quaternion: [number, number, number, number];
+  scale: number;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const points = useMemo(() => boxEdges(box), [box]);
+  // Dash sizing in the box's local units → consistent density across box sizes.
+  const dash = useMemo(() => {
+    const s = new THREE.Vector3();
+    box.getSize(s);
+    return Math.max(0.05, ((s.x + s.y + s.z) / 3) * 0.05);
+  }, [box]);
+  useLiveMirror(id, groupRef);
+
+  return (
+    <group ref={groupRef} position={position} quaternion={quaternion} scale={scale}>
+      <Line
+        points={points}
+        segments
+        color="#1900ff"
+        lineWidth={1.75}
+        dashed
+        dashSize={dash}
+        gapSize={dash}
+        transparent
+        depthTest={false}
+        toneMapped={false}
+      />
+    </group>
+  );
+}
+
+/** Bbox markers while edit mode is active: dashed edges on the editing memory,
+ *  corner brackets on the rest. */
 export default function EditBoxes({
   records,
   selectedId,
@@ -101,16 +152,16 @@ export default function EditBoxes({
         const box = getBounds(r.id);
         if (!box) return null;
         const a = toSplatSceneArgs(r);
-        return (
-          <CornerBox
-            key={r.id}
-            id={r.id}
-            box={box}
-            position={[a.position[0], a.position[1], a.position[2]]}
-            quaternion={a.rotation}
-            scale={a.scale[0]}
-            selected={r.id === selectedId}
-          />
+        const common = {
+          box,
+          position: [a.position[0], a.position[1], a.position[2]] as THREE.Vector3Tuple,
+          quaternion: a.rotation,
+          scale: a.scale[0],
+        };
+        return r.id === selectedId ? (
+          <DashedBox key={r.id} id={r.id} {...common} />
+        ) : (
+          <CornerBox key={r.id} {...common} />
         );
       })}
     </>

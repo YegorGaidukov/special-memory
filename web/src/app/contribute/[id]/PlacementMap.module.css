@@ -1,0 +1,109 @@
+.controls {
+  display: grid;
+  gap: 16px;
+}
+
+.map {
+  width: 100%;
+  height: 360px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.control {
+  display: grid;
+  gap: 8px;
+}
+.controlHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.label {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--ink);
+}
+.hint {
+  font-size: 11.5px;
+  color: var(--ink-mute);
+}
+
+/* Custom range: a thin track with an accent fill (driven by an inline gradient)
+   and an accent thumb. */
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  outline: none;
+  cursor: pointer;
+}
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--void);
+  box-shadow: 0 0 0 1px var(--accent), 0 1px 5px var(--accent-glow);
+  cursor: pointer;
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
+}
+.range::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+}
+.range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 0 1px var(--accent);
+}
+.range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--void);
+  cursor: pointer;
+}
+
+.readout {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+  margin: 0;
+}
+
+.save {
+  justify-self: start;
+  padding: 9px 18px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms var(--ease-out), box-shadow 150ms var(--ease-out),
+    transform 100ms var(--ease-out);
+}
+.save:hover:not(:disabled) {
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.save:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

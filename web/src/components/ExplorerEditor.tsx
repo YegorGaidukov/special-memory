@@ -1,43 +1,20 @@
 "use client";
 
-import { OrbitControls } from "@react-three/drei";
 import { useThree, useFrame } from "@react-three/fiber";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { MemoryRecord } from "@/lib/manifest/types";
-import { getResident, getBounds } from "@/lib/splat/registry";
-import {
-  readMeshTransform,
-  toSplatSceneArgs,
-  type StoredTransform,
-} from "@/lib/transform/apply";
-import SplatGizmo, { type GizmoMode } from "@/components/SplatGizmo";
+import { getResident } from "@/lib/splat/registry";
+import { readMeshTransform, type StoredTransform } from "@/lib/transform/apply";
+import { worldCorners, memoryAtPointer } from "@/lib/camera/pickAtPointer";
+import Gizmo, { type GizmoMode } from "@/components/Gizmo";
 import EditBoxes from "@/components/EditBoxes";
 
-// A memory's current world-space AABB: its cached local bbox placed by the live
-// (gizmo-driven) mesh when resident, else by its stored transform. Used to
-// raycast clicks against splats.
-function worldBox(r: MemoryRecord): THREE.Box3 | null {
-  const local = getBounds(r.id);
-  if (!local) return null;
-  let m: THREE.Matrix4;
-  const obj = getResident(r.id);
-  if (obj) {
-    obj.updateWorldMatrix(true, false);
-    m = obj.matrixWorld;
-  } else {
-    const a = toSplatSceneArgs(r);
-    m = new THREE.Matrix4().compose(
-      new THREE.Vector3(a.position[0], a.position[1], a.position[2]),
-      new THREE.Quaternion(a.rotation[0], a.rotation[1], a.rotation[2], a.rotation[3]),
-      new THREE.Vector3(a.scale[0], a.scale[0], a.scale[0]),
-    );
-  }
-  return local.clone().applyMatrix4(m);
-}
+// Click radius (px) around a projected bbox corner that counts as selecting it.
+const CORNER_PX = 26;
 
-// In-canvas half of the explorer edit mode: OrbitControls to move around, click
-// directly on a splat (raycast against its bounding box) to select it, bbox
+// In-canvas half of the explorer edit mode: shared Navigation provides the camera
+// controls; this adds click-to-select (raycast against bounding boxes), bbox
 // corner markers on every memory, and a gizmo bound to the selected memory's
 // resident splat. Selection forces the memory resident in Memories.tsx (via the
 // parent's forceResidentId), so we poll the registry until its mesh appears.
@@ -56,13 +33,6 @@ export default function ExplorerEditor({
 }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
-  // `s.controls` is whatever called makeDefault. On entering edit mode it can
-  // briefly still be FreeFly's PointerLockControls (no `.target`) before drei's
-  // OrbitControls registers, so treat `target` as possibly-absent and re-run
-  // these effects once the real OrbitControls (which has it) takes over.
-  const controls = useThree((s) => s.controls) as
-    | { target?: THREE.Vector3; update?: () => void }
-    | null;
   const [mesh, setMesh] = useState<THREE.Object3D | null>(null);
 
   const recordsRef = useRef(records);
@@ -84,27 +54,39 @@ export default function ExplorerEditor({
     const onUp = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;
       const rect = canvas.getBoundingClientRect();
+
+      // 1) Precise: select the memory whose nearest projected bbox corner is
+      // within CORNER_PX of the click. Wins over the body raycast below, so you
+      // can pick a specific memory by its brackets even where boxes overlap.
+      let cornerId: string | null = null;
+      let cornerBest = CORNER_PX;
+      for (const r of recordsRef.current) {
+        const corners = worldCorners(r);
+        if (!corners) continue;
+        for (const c of corners) {
+          const n = c.clone().project(camera);
+          if (n.z < -1 || n.z > 1) continue; // behind camera / out of depth range
+          const sx = rect.left + (n.x * 0.5 + 0.5) * rect.width;
+          const sy = rect.top + (-n.y * 0.5 + 0.5) * rect.height;
+          const dd = Math.hypot(e.clientX - sx, e.clientY - sy);
+          if (dd < cornerBest) {
+            cornerBest = dd;
+            cornerId = r.id;
+          }
+        }
+      }
+      if (cornerId) {
+        onSelectRef.current(cornerId);
+        return;
+      }
+
+      // 2) Fallback: raycast the pointer against each memory's world bbox and
+      // pick the nearest hit (clicking the body, not near a corner).
       const ndc = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
         -((e.clientY - rect.top) / rect.height) * 2 + 1,
       );
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(ndc, camera);
-      const point = new THREE.Vector3();
-      let bestId: string | null = null;
-      let bestDist = Infinity;
-      for (const r of recordsRef.current) {
-        const box = worldBox(r);
-        if (!box) continue;
-        if (raycaster.ray.intersectBox(box, point)) {
-          const d = raycaster.ray.origin.distanceTo(point);
-          if (d < bestDist) {
-            bestDist = d;
-            bestId = r.id;
-          }
-        }
-      }
-      onSelectRef.current(bestId);
+      onSelectRef.current(memoryAtPointer(recordsRef.current, ndc, camera));
     };
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointerup", onUp);
@@ -114,52 +96,39 @@ export default function ExplorerEditor({
     };
   }, [camera, gl]);
 
-  // Center the orbit on a point ahead of the camera when edit mode opens, so the
-  // first drag doesn't swing wildly around the world origin.
-  useEffect(() => {
-    if (!controls?.target) return;
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    controls.target.set(
-      camera.position.x + dir.x * 20,
-      camera.position.y + dir.y * 20,
-      camera.position.z + dir.z * 20,
-    );
-    controls.update?.();
-  }, [controls, camera]);
-
-  // Selection changed: drop the old mesh and recenter the orbit on the new one.
+  // Selection changed: drop the old mesh and clear the readout. The camera is
+  // left untouched — selecting a memory only rebinds the gizmo, it never moves
+  // or reorients the view (recentering the orbit here swung the camera on every
+  // pick). Navigation owns the camera controls.
   useEffect(() => {
     setMesh(null);
     onTransformChange(null);
-    if (!controls?.target || !selectedId) return;
-    const rec = recordsRef.current.find((r) => r.id === selectedId);
-    if (!rec) return;
-    const p = rec.transform.position;
-    controls.target.set(p[0], p[1], p[2]);
-    controls.update?.();
-  }, [selectedId, controls, onTransformChange]);
+  }, [selectedId, onTransformChange]);
 
-  // Poll the registry until the selected memory's full splat is resident.
+  // Poll the registry until the selected memory's full splat is resident, and
+  // keep bound to the *current* resident mesh: if the one we hold was disposed
+  // and replaced (LOD recycle), rebind so the gizmo never drives a dead object
+  // and `readMeshTransform` on save reads the live mesh.
   useFrame(() => {
     if (!selectedId) {
       if (mesh) setMesh(null);
       return;
     }
-    if (mesh) return;
     const found = getResident(selectedId);
+    if (mesh && mesh === found) return;
     if (found) {
       setMesh(found);
       onTransformChange(readMeshTransform(found));
+    } else if (mesh) {
+      setMesh(null);
     }
   });
 
   return (
     <>
-      <OrbitControls makeDefault />
       <EditBoxes records={records} selectedId={selectedId} />
       {mesh && (
-        <SplatGizmo
+        <Gizmo
           object={mesh}
           mode={mode}
           onObjectChange={() => onTransformChange(readMeshTransform(mesh))}

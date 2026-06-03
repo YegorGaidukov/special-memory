@@ -57,9 +57,13 @@ touching code. See `.env.local.example`.
 
 ## Controls
 
-- **Click** the canvas to capture the mouse (pointer lock); **Esc** to release.
-- **Mouse** to look; **WASD** to fly in the direction you're looking.
-- Aim the centre dot at a memory and **click** to travel to it (WASD cancels).
+Shared in both the public fly-through and the curator edit mode (`Navigation`):
+
+- **Left-drag** to look/orbit, **right-drag** to pan, **scroll** to zoom.
+- **WASD** to fly in the direction you're looking (**Shift** to boost).
+- **Double-click** a memory to fly to it (any input cancels mid-flight).
+- Edit mode (**E**): **click** a memory to select it, **G/R/S** to move/rotate/scale
+  with the gizmo.
 
 ## Architecture
 
@@ -70,13 +74,15 @@ is the single mocked seam, proven by the manual smoke test below — mirroring S
 - `lib/manifest` — parse + validate the explorer manifest; resolve asset URLs.
 - `lib/transform` — map a memory's stored transform to renderer args, applying
   the SHARP→three.js (180°-about-X) frame correction. No geo math (that's S3).
-- `lib/camera` — fly-to tween, framing, and "look at it and click" picking.
+- `lib/camera` — fly-to tween, framing, and cursor→memory bbox picking
+  (`memoryAtPointer`, shared by edit-mode select and fly-mode travel).
 - `lib/lod` — distance-based load/dispose decisions (`decideLod`, hysteresis) and
   the preview-asset URL derivation (`previewUrlFor`).
 - `lib/splat` — `loadPreviewPoints` (fetch + parse a `.preview.ply` into a
   `THREE.Points` cloud via Spark's `PlyReader`).
 - `components/` — the R3F canvas (`SplatWorld`), the residency loader
-  (`Memories`), free-fly (`FreeFly`), the travel HUD (`TravelOverlay`).
+  (`Memories`), shared navigation (`Navigation` — orbit + WASD fly, both modes),
+  double-click travel (`Travel`), the travel HUD (`TravelOverlay`).
 
 `Memories` owns the per-memory level of detail: it loads a decimated
 `THREE.Points` preview for every record, then a throttled per-frame tick runs

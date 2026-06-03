@@ -1,7 +1,7 @@
 "use client";
 
 import { useThree, useFrame } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/config/explorer";
 import { resolveAssetUrl } from "@/lib/manifest/url";
 import { toSplatSceneArgs } from "@/lib/transform/apply";
+import { recordsSignature } from "@/lib/transform/overlay";
 import { decideLod } from "@/lib/lod/decide";
 import { previewUrlFor } from "@/lib/lod/previewUrl";
 import { loadPreviewPoints } from "@/lib/splat/loadPreviewPoints";
@@ -50,6 +51,15 @@ export default function Memories({
   const forceResidentIdRef = useRef(forceResidentId);
   forceResidentIdRef.current = forceResidentId;
 
+  // Latest records, read inside useFrame / async callbacks so transform edits are
+  // picked up without tearing the SparkRenderer down. The heavy setup effect
+  // keys on `sig` (id + splat_url set) — a placement edit changes `records`
+  // identity but not `sig`, so it re-places splats in place (the effect below)
+  // rather than reloading every splat.
+  const recordsRef = useRef(records);
+  recordsRef.current = records;
+  const sig = useMemo(() => recordsSignature(records), [records]);
+
   const sparkRef = useRef<SparkRenderer | null>(null);
   const previews = useRef<Map<string, THREE.Points>>(new Map());
   const splats = useRef<Map<string, SplatMesh>>(new Map());
@@ -71,11 +81,15 @@ export default function Memories({
 
     const ac = new AbortController();
     for (const r of records) {
-      const { position, rotation, scale } = toSplatSceneArgs(r);
       const url = resolveAssetUrl(MEMORIES_BASE_URL, previewUrlFor(r.splat_url));
       loadPreviewPoints(url, PREVIEW.pointSize, ac.signal)
         .then((pts) => {
-          // Place the ghost exactly where the full splat will sit.
+          // Place the ghost exactly where the full splat will sit — reading the
+          // latest record so a preview that finishes loading after an edit lands
+          // at the edited placement, not the one captured when setup ran.
+          const { position, rotation, scale } = toSplatSceneArgs(
+            recordsRef.current.find((x) => x.id === r.id) ?? r,
+          );
           pts.position.set(position[0], position[1], position[2]);
           pts.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
           pts.scale.setScalar(scale[0]); // SplatMesh scale is uniform
@@ -117,9 +131,36 @@ export default function Memories({
       spark.dispose();
       sparkRef.current = null;
     };
-  }, [gl, scene, records]);
+  }, [gl, scene, sig]);
+
+  // Re-place ghosts + resident splats in place when a memory's stored transform
+  // changes (a curator edit overlaid onto `records`), without rebuilding the
+  // SparkRenderer. The actively-pinned memory (forceResidentId) is skipped — the
+  // gizmo owns its live mesh, and its overlay value was mirrored from that mesh.
+  // Re-runs when the pin moves too, so the just-released memory's ghost (which
+  // was skipped while pinned) is synced to its edited placement on deselect/exit
+  // — otherwise it snaps back to the stale ghost position when LOD recycles it.
+  useEffect(() => {
+    for (const r of records) {
+      if (r.id === forceResidentId) continue;
+      const { position, rotation, scale } = toSplatSceneArgs(r);
+      const ghost = previews.current.get(r.id);
+      if (ghost) {
+        ghost.position.set(position[0], position[1], position[2]);
+        ghost.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+        ghost.scale.setScalar(scale[0]);
+      }
+      const splat = splats.current.get(r.id);
+      if (splat) {
+        splat.position.set(position[0], position[1], position[2]);
+        splat.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+        splat.scale.setScalar(scale[0]);
+      }
+    }
+  }, [records, forceResidentId]);
 
   useFrame((_, delta) => {
+    const records = recordsRef.current;
     if (records.length === 0) return;
 
     // Every frame: advance any point-cloud -> splat cross-dissolves.

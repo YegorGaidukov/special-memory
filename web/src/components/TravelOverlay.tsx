@@ -28,7 +28,7 @@ export default function TravelOverlay({
           ...panel,
           top: 14,
           left: 16,
-          color: "#aab4cc",
+          color: "var(--ink-dim)",
           fontWeight: 600,
           letterSpacing: 0.3,
         }}
@@ -36,18 +36,18 @@ export default function TravelOverlay({
         Collective Memory City
       </div>
 
-      <div style={{ ...panel, left: 16, bottom: 14, color: "#7a8499", maxWidth: "80vw" }}>
+      <div style={{ ...panel, left: 16, bottom: 14, color: "var(--ink-mute)", maxWidth: "80vw" }}>
         {status === "loading" && "Loading memories…"}
         {status === "error" && `Failed to load memories: ${error ?? ""}`}
         {status === "ready" &&
-          `${count} memories · click to look · WASD to fly · aim + click a memory to travel · Esc to release`}
+          `${count} memories · drag to look · scroll to zoom · WASD to fly · double-click a memory to travel`}
       </div>
 
       {current && (
-        <div style={{ ...panel, right: 16, bottom: 14, textAlign: "right", color: "#cdd6ea" }}>
+        <div style={{ ...panel, right: 16, bottom: 14, textAlign: "right", color: "var(--ink)" }}>
           <div style={{ fontWeight: 600 }}>{current.id}</div>
           {current.captured_at && (
-            <div style={{ color: "#7a8499" }}>
+            <div style={{ color: "var(--ink-mute)" }}>
               {new Date(current.captured_at).toLocaleDateString()}
             </div>
           )}

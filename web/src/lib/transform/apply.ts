@@ -72,3 +72,23 @@ export function readMeshTransform(obj: MeshTransform): StoredTransform {
     scale: [obj.scale.x, obj.scale.y, obj.scale.z],
   });
 }
+
+/** Minimal mutable shape of a three.js Object3D transform (the setters we drive). */
+interface MutableMeshTransform {
+  position: { set(x: number, y: number, z: number): void };
+  quaternion: { set(x: number, y: number, z: number, w: number): void };
+  scale: { setScalar(s: number): void };
+}
+
+/**
+ * Write a stored transform onto a live mesh — the forward of
+ * {@link readMeshTransform}, so a numeric field edit in the HUD moves the splat
+ * (and the gizmo, which follows the object each frame). Applies the same
+ * SHARP→three.js correction `toSplatSceneArgs` does, and sets a uniform scale.
+ */
+export function applyStoredTransform(obj: MutableMeshTransform, t: StoredTransform): void {
+  const rotation = multiplyQuat(t.quaternion, SHARP_TO_THREE);
+  obj.position.set(t.position[0], t.position[1], t.position[2]);
+  obj.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+  obj.scale.setScalar(t.scale);
+}

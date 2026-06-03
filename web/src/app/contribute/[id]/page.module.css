@@ -1,0 +1,100 @@
+.wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 7vh 24px 12vh;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  display: grid;
+  gap: 18px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.lead {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  max-width: 60ch;
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.sectionTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sectionLead {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+.locked {
+  margin: 0;
+  color: var(--ink-mute);
+  font-size: 0.9rem;
+}
+
+/* Inline status block for the post-save next steps. */
+.note {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in oklab, var(--ok) 28%, transparent);
+  background: color-mix(in oklab, var(--ok) 9%, transparent);
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.noteTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--field);
+  border: 1px solid var(--line);
+}
+
+.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.link:hover {
+  color: var(--accent-strong);
+}
+
+.error {
+  color: var(--danger);
+}
+.muted {
+  color: var(--ink-dim);
+}

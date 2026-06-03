@@ -3,7 +3,9 @@ import {
   toSplatSceneArgs,
   fromSplatSceneArgs,
   readMeshTransform,
+  applyStoredTransform,
   normalizeScale,
+  type StoredTransform,
 } from "@/lib/transform/apply";
 import type { MemoryRecord, Quat } from "@/lib/manifest/types";
 
@@ -99,5 +101,84 @@ describe("readMeshTransform", () => {
     expect(back.position).toEqual([5, -1, 2]);
     expectQuatClose(back.quaternion, [0, 0, 0, 1]);
     expect(back.scale).toBeCloseTo(1.5, 6);
+  });
+});
+
+// A mutable stand-in for THREE.Object3D's position/quaternion/scale: the setters
+// applyStoredTransform calls, plus the x/y/z/w fields readMeshTransform reads.
+function mockMesh() {
+  return {
+    position: {
+      x: 0,
+      y: 0,
+      z: 0,
+      set(x: number, y: number, z: number) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+      },
+    },
+    quaternion: {
+      x: 0,
+      y: 0,
+      z: 0,
+      w: 1,
+      set(x: number, y: number, z: number, w: number) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+      },
+    },
+    scale: {
+      x: 1,
+      y: 1,
+      z: 1,
+      setScalar(s: number) {
+        this.x = s;
+        this.y = s;
+        this.z = s;
+      },
+    },
+  };
+}
+
+describe("applyStoredTransform", () => {
+  it("is the inverse of readMeshTransform (apply ∘ read === identity)", () => {
+    const stored: StoredTransform = {
+      position: [5, -1, 2],
+      quaternion: [0, 0.7071, 0, 0.7071], // 90° about Y
+      scale: 1.5,
+    };
+    const mesh = mockMesh();
+    applyStoredTransform(mesh, stored);
+    const back = readMeshTransform(mesh);
+    expect(back.position).toEqual([5, -1, 2]);
+    expectQuatClose(back.quaternion, stored.quaternion);
+    expect(back.scale).toBeCloseTo(1.5, 6);
+  });
+
+  it("writes a uniform scalar scale onto all three axes", () => {
+    const mesh = mockMesh();
+    applyStoredTransform(mesh, {
+      position: [0, 0, 0],
+      quaternion: [0, 0, 0, 1],
+      scale: 2.5,
+    });
+    expect(mesh.scale.x).toBeCloseTo(2.5, 6);
+    expect(mesh.scale.y).toBeCloseTo(2.5, 6);
+    expect(mesh.scale.z).toBeCloseTo(2.5, 6);
+  });
+
+  it("applies the SHARP->three correction so an identity orientation tilts 180° about X", () => {
+    const mesh = mockMesh();
+    applyStoredTransform(mesh, {
+      position: [0, 0, 0],
+      quaternion: [0, 0, 0, 1],
+      scale: 1,
+    });
+    // mesh quaternion = stored ∘ SHARP_TO_THREE = [1,0,0,0]
+    expect(mesh.quaternion.x).toBeCloseTo(1, 6);
+    expect(mesh.quaternion.w).toBeCloseTo(0, 6);
   });
 });

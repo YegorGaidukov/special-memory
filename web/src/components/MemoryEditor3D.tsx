@@ -2,16 +2,17 @@
 
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import { MEMORIES_BASE_URL } from "@/config/explorer";
 import { resolveAssetUrl } from "@/lib/manifest/url";
 import {
   toSplatSceneArgs,
   readMeshTransform,
+  applyStoredTransform,
   type StoredTransform,
 } from "@/lib/transform/apply";
-import SplatGizmo, { type GizmoMode } from "@/components/SplatGizmo";
+import Gizmo, { type GizmoMode } from "@/components/Gizmo";
 import EditHud from "@/components/EditHud";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
@@ -23,11 +24,13 @@ function SingleSplat({
   record,
   mode,
   onChange,
+  onMesh,
   onDraggingChanged,
 }: {
   record: MemoryRecord;
   mode: GizmoMode;
   onChange: (t: StoredTransform) => void;
+  onMesh: (m: SplatMesh | null) => void;
   onDraggingChanged: (dragging: boolean) => void;
 }) {
   const gl = useThree((s) => s.gl);
@@ -48,11 +51,13 @@ function SingleSplat({
     m.initialized
       .then(() => {
         setMesh(m);
+        onMesh(m); // expose the mesh so numeric-field edits can write to it
         onChange(readMeshTransform(m)); // seed the HUD with the loaded transform
       })
       .catch((err) => console.error("[editor] splat load failed", record.id, err));
 
     return () => {
+      onMesh(null);
       scene.remove(m);
       m.dispose();
       scene.remove(spark);
@@ -63,7 +68,7 @@ function SingleSplat({
   }, [gl, scene, record.id, record.splat_url]);
 
   return mesh ? (
-    <SplatGizmo
+    <Gizmo
       object={mesh}
       mode={mode}
       onObjectChange={() => onChange(readMeshTransform(mesh))}
@@ -83,6 +88,13 @@ export default function MemoryEditor3D({ record }: { record: MemoryRecord }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const meshRef = useRef<SplatMesh | null>(null);
+
+  // A numeric-field edit: write it onto the live mesh, then mirror to the readout.
+  const applyEdit = (next: StoredTransform) => {
+    if (meshRef.current) applyStoredTransform(meshRef.current, next);
+    setTransform(next);
+  };
 
   // Keyboard mode switch (G/R/S), Blender-style.
   useEffect(() => {
@@ -117,10 +129,19 @@ export default function MemoryEditor3D({ record }: { record: MemoryRecord }) {
   }
 
   return (
-    <div style={{ position: "relative", width: "100%", height: 420, borderRadius: 8, overflow: "hidden" }}>
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: 420,
+        borderRadius: "var(--r-lg)",
+        border: "1px solid var(--line)",
+        overflow: "hidden",
+      }}
+    >
       <Canvas
         dpr={[1, 1.5]}
-        gl={{ antialias: false }}
+        gl={{ antialias: true }} // crisp gizmo/lines for the curator editor
         camera={{ position: [target[0], target[1] + 3, target[2] + 10], fov: 60, near: 0.1, far: 3000 }}
       >
         <color attach="background" args={["#05060a"]} />
@@ -129,6 +150,7 @@ export default function MemoryEditor3D({ record }: { record: MemoryRecord }) {
           record={record}
           mode={mode}
           onChange={setTransform}
+          onMesh={(m) => (meshRef.current = m)}
           onDraggingChanged={() => {}}
         />
       </Canvas>
@@ -136,11 +158,12 @@ export default function MemoryEditor3D({ record }: { record: MemoryRecord }) {
         mode={mode}
         onModeChange={setMode}
         transform={transform}
+        onEditTransform={applyEdit}
         onSave={save}
         saving={saving}
         saveError={saveError}
+        savedAt={savedAt}
         hint="Loading memory…"
-        selectedLabel={savedAt ? "Saved ✓" : null}
       />
     </div>
   );
