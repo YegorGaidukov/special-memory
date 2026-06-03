@@ -15,6 +15,7 @@ import { toSplatSceneArgs } from "@/lib/transform/apply";
 import { decideLod } from "@/lib/lod/decide";
 import { previewUrlFor } from "@/lib/lod/previewUrl";
 import { loadPreviewPoints } from "@/lib/splat/loadPreviewPoints";
+import { setResident, clearResident } from "@/lib/splat/registry";
 import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
 
 // Places every memory in the void and manages its level of detail. Each memory
@@ -27,10 +28,22 @@ import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
 // SplatMesh objects. Spark's per-mesh `initialized`/`dispose()` lifecycle has no
 // add/remove race (the reason auto-LOD was deferred under the old library), so
 // `decideLod()` can drive residency directly, holding each mesh by reference.
-export default function Memories({ records }: { records: MemoryRecord[] }) {
+export default function Memories({
+  records,
+  forceResidentId = null,
+}: {
+  records: MemoryRecord[];
+  // Keep this memory's full splat resident regardless of distance (the explorer
+  // edit mode pins the selected memory so its gizmo can attach to a loaded mesh).
+  forceResidentId?: string | null;
+}) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
+
+  // Read inside useFrame without re-binding the loop each render.
+  const forceResidentIdRef = useRef(forceResidentId);
+  forceResidentIdRef.current = forceResidentId;
 
   const sparkRef = useRef<SparkRenderer | null>(null);
   const previews = useRef<Map<string, THREE.Points>>(new Map());
@@ -84,7 +97,8 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
         (pts.material as THREE.Material).dispose();
       }
       loadedPreviews.clear();
-      for (const mesh of loadedSplats.values()) {
+      for (const [id, mesh] of loadedSplats) {
+        clearResident(id);
         scene.remove(mesh);
         mesh.dispose();
       }
@@ -120,6 +134,7 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
             f.points.visible = true;
             (f.points.material as THREE.PointsMaterial).opacity = 1;
           }
+          clearResident(id);
           splats.current.delete(id);
           scene.remove(f.mesh);
           f.mesh.dispose();
@@ -139,7 +154,17 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
     const resident = new Set(
       [...splats.current.keys()].filter((id) => fades.current.get(id)?.dir !== -1),
     );
-    const { toLoad, toUnload } = decideLod(records, camPos, resident, LOD);
+    const decided = decideLod(records, camPos, resident, LOD);
+    let toLoad = decided.toLoad;
+    let toUnload = decided.toUnload;
+
+    // Pin the explorer-selected memory: never unload it, and force it to load
+    // even when the camera is far, so the edit gizmo always has a real mesh.
+    const force = forceResidentIdRef.current;
+    if (force) {
+      toUnload = toUnload.filter((id) => id !== force);
+      if (!resident.has(force) && !toLoad.includes(force)) toLoad = [...toLoad, force];
+    }
 
     for (const id of toLoad) {
       const r = records.find((x) => x.id === id);
@@ -174,11 +199,14 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
           // Cross-dissolve the point cloud into the splat — but only if this mesh
           // is still the resident one (it may have been disposed mid-load).
           if (splats.current.get(id) !== mesh) return;
+          // Resident and loaded: expose it so the edit gizmo can attach.
+          setResident(id, mesh);
           fades.current.set(id, { mesh, points: previews.current.get(id), t: 0, dir: 1 });
         })
         .catch((err) => {
           if (splats.current.get(id) !== mesh) return; // disposed mid-load
           console.error("[explorer] splat load failed", id, err);
+          clearResident(id);
           splats.current.delete(id);
           scene.remove(mesh);
           mesh.dispose();
@@ -192,6 +220,7 @@ export default function Memories({ records }: { records: MemoryRecord[] }) {
       // Never faded in (still loading) — nothing on screen to dissolve, so
       // dispose now; its `initialized` handler sees it's gone and bails.
       if (!f && mesh.opacity === 0) {
+        clearResident(id);
         splats.current.delete(id);
         scene.remove(mesh);
         mesh.dispose();

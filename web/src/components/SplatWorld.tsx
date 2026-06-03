@@ -1,11 +1,15 @@
 "use client";
 
 import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useManifest } from "@/hooks/useManifest";
 import FreeFly from "@/components/FreeFly";
 import Memories from "@/components/Memories";
+import ExplorerEditor from "@/components/ExplorerEditor";
+import EditHud from "@/components/EditHud";
 import TravelOverlay from "@/components/TravelOverlay";
+import type { GizmoMode } from "@/components/SplatGizmo";
+import type { StoredTransform } from "@/lib/transform/apply";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
 // Stable empty list so FreeFly's effects don't re-bind before the manifest loads.
@@ -45,6 +49,64 @@ export default function SplatWorld() {
   const [current, setCurrent] = useState<MemoryRecord | null>(null);
   const records = m.status === "ready" ? m.manifest.memories : EMPTY;
 
+  // Edit mode: a curator toggle (off by default — the public fly-through is
+  // untouched). It swaps pointer-lock free-fly for OrbitControls + a transform
+  // gizmo on the selected memory, writing the edit straight to the record.
+  const [editMode, setEditMode] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mode, setMode] = useState<GizmoMode>("translate");
+  const [liveTransform, setLiveTransform] = useState<StoredTransform | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const exitEdit = useCallback(() => {
+    setEditMode(false);
+    setSelectedId(null);
+    setLiveTransform(null);
+    setSaveError(null);
+  }, []);
+
+  // E toggles edit mode (releasing pointer lock); G/R/S switch gizmo mode.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "e" || e.key === "E") {
+        setEditMode((on) => {
+          const next = !on;
+          if (next) document.exitPointerLock();
+          else {
+            setSelectedId(null);
+            setLiveTransform(null);
+          }
+          return next;
+        });
+      } else if (editMode) {
+        if (e.key === "g" || e.key === "G") setMode("translate");
+        else if (e.key === "r" || e.key === "R") setMode("rotate");
+        else if (e.key === "s" || e.key === "S") setMode("scale");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editMode]);
+
+  async function saveTransform() {
+    if (!selectedId || !liveTransform) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const r = await fetch(`/api/memories/${selectedId}/transform`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transform: liveTransform }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+    } catch (e) {
+      setSaveError(String((e as Error).message ?? e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <>
       <Canvas
@@ -60,10 +122,63 @@ export default function SplatWorld() {
       >
         <color attach="background" args={["#05060a"]} />
         <ContextLossLogger />
-        {m.status === "ready" && <Memories records={m.manifest.memories} />}
-        <FreeFly records={records} onArrive={setCurrent} />
+        {m.status === "ready" && (
+          <Memories
+            records={m.manifest.memories}
+            forceResidentId={editMode ? selectedId : null}
+          />
+        )}
+        {editMode ? (
+          <ExplorerEditor
+            records={records}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            mode={mode}
+            onTransformChange={setLiveTransform}
+          />
+        ) : (
+          <FreeFly records={records} onArrive={setCurrent} />
+        )}
       </Canvas>
       <Crosshair />
+      {editMode ? (
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none" }}>
+          <EditHud
+            mode={mode}
+            onModeChange={setMode}
+            transform={liveTransform}
+            onSave={saveTransform}
+            saving={saving}
+            saveError={saveError}
+            selectedLabel={selectedId}
+            hint={selectedId ? "Loading memory…" : "Aim at a memory and click to select."}
+            onDeselect={() => setSelectedId(null)}
+            onExit={exitEdit}
+          />
+        </div>
+      ) : (
+        <button
+          onClick={() => {
+            document.exitPointerLock();
+            setEditMode(true);
+          }}
+          style={{
+            position: "fixed",
+            top: 12,
+            right: 12,
+            zIndex: 10,
+            padding: "6px 12px",
+            borderRadius: 6,
+            border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(8,10,16,0.7)",
+            color: "#e6e9f0",
+            font: "12px monospace",
+            cursor: "pointer",
+          }}
+        >
+          Edit (E)
+        </button>
+      )}
       <TravelOverlay
         status={m.status}
         count={records.length}
