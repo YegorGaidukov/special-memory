@@ -4,15 +4,41 @@ import { OrbitControls } from "@react-three/drei";
 import { useThree, useFrame } from "@react-three/fiber";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
-import { pickMemory } from "@/lib/camera/pick";
-import { PICK } from "@/config/explorer";
-import { getResident } from "@/lib/splat/registry";
-import { readMeshTransform, type StoredTransform } from "@/lib/transform/apply";
+import type { MemoryRecord } from "@/lib/manifest/types";
+import { getResident, getBounds } from "@/lib/splat/registry";
+import {
+  readMeshTransform,
+  toSplatSceneArgs,
+  type StoredTransform,
+} from "@/lib/transform/apply";
 import SplatGizmo, { type GizmoMode } from "@/components/SplatGizmo";
+import EditBoxes from "@/components/EditBoxes";
+
+// A memory's current world-space AABB: its cached local bbox placed by the live
+// (gizmo-driven) mesh when resident, else by its stored transform. Used to
+// raycast clicks against splats.
+function worldBox(r: MemoryRecord): THREE.Box3 | null {
+  const local = getBounds(r.id);
+  if (!local) return null;
+  let m: THREE.Matrix4;
+  const obj = getResident(r.id);
+  if (obj) {
+    obj.updateWorldMatrix(true, false);
+    m = obj.matrixWorld;
+  } else {
+    const a = toSplatSceneArgs(r);
+    m = new THREE.Matrix4().compose(
+      new THREE.Vector3(a.position[0], a.position[1], a.position[2]),
+      new THREE.Quaternion(a.rotation[0], a.rotation[1], a.rotation[2], a.rotation[3]),
+      new THREE.Vector3(a.scale[0], a.scale[0], a.scale[0]),
+    );
+  }
+  return local.clone().applyMatrix4(m);
+}
 
 // In-canvas half of the explorer edit mode: OrbitControls to move around, click
-// (not drag) to select the looked-at memory, and a gizmo bound to that memory's
+// directly on a splat (raycast against its bounding box) to select it, bbox
+// corner markers on every memory, and a gizmo bound to the selected memory's
 // resident splat. Selection forces the memory resident in Memories.tsx (via the
 // parent's forceResidentId), so we poll the registry until its mesh appears.
 export default function ExplorerEditor({
@@ -44,8 +70,9 @@ export default function ExplorerEditor({
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
-  // Click selects the memory the camera is aimed at. Ignore pointer-ups that
-  // moved far from the press (those were OrbitControls drags, not clicks).
+  // Click directly on a splat to select it: raycast the pointer against each
+  // memory's world bbox and pick the nearest hit. Ignore pointer-ups that moved
+  // far from the press (those were OrbitControls drags, not clicks).
   useEffect(() => {
     const canvas = gl.domElement;
     let downX = 0;
@@ -56,14 +83,28 @@ export default function ExplorerEditor({
     };
     const onUp = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      const origin: Vec3 = [camera.position.x, camera.position.y, camera.position.z];
-      const hit = pickMemory(recordsRef.current, origin, [dir.x, dir.y, dir.z], {
-        maxAngleRad: PICK.maxAngleRad,
-        maxDist: PICK.maxDist,
-      });
-      onSelectRef.current(hit ? hit.id : null);
+      const rect = canvas.getBoundingClientRect();
+      const ndc = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(ndc, camera);
+      const point = new THREE.Vector3();
+      let bestId: string | null = null;
+      let bestDist = Infinity;
+      for (const r of recordsRef.current) {
+        const box = worldBox(r);
+        if (!box) continue;
+        if (raycaster.ray.intersectBox(box, point)) {
+          const d = raycaster.ray.origin.distanceTo(point);
+          if (d < bestDist) {
+            bestDist = d;
+            bestId = r.id;
+          }
+        }
+      }
+      onSelectRef.current(bestId);
     };
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointerup", onUp);
@@ -116,6 +157,7 @@ export default function ExplorerEditor({
   return (
     <>
       <OrbitControls makeDefault />
+      <EditBoxes records={records} selectedId={selectedId} />
       {mesh && (
         <SplatGizmo
           object={mesh}

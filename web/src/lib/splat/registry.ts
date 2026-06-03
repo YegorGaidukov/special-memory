@@ -1,4 +1,4 @@
-import type { Object3D } from "three";
+import type { Box3, Object3D } from "three";
 
 // A tiny module-scope registry of currently-resident full SplatMesh objects,
 // keyed by memory id. Memories.tsx registers a mesh once it has loaded and clears
@@ -17,4 +17,21 @@ export function clearResident(id: string): void {
 
 export function getResident(id: string): Object3D | null {
   return resident.get(id) ?? null;
+}
+
+// Per-memory LOCAL-space bounding box (before the memory's placement transform),
+// derived once from its preview point cloud. The edit mode reads these to draw
+// bbox corner markers and to raycast clicks against each memory's world box.
+const bounds = new Map<string, Box3>();
+
+export function setBounds(id: string, box: Box3): void {
+  bounds.set(id, box);
+}
+
+export function getBounds(id: string): Box3 | null {
+  return bounds.get(id) ?? null;
+}
+
+export function clearBounds(id: string): void {
+  bounds.delete(id);
 }

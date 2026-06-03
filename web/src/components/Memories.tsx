@@ -15,7 +15,12 @@ import { toSplatSceneArgs } from "@/lib/transform/apply";
 import { decideLod } from "@/lib/lod/decide";
 import { previewUrlFor } from "@/lib/lod/previewUrl";
 import { loadPreviewPoints } from "@/lib/splat/loadPreviewPoints";
-import { setResident, clearResident } from "@/lib/splat/registry";
+import {
+  setResident,
+  clearResident,
+  setBounds,
+  clearBounds,
+} from "@/lib/splat/registry";
 import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
 
 // Places every memory in the void and manages its level of detail. Each memory
@@ -77,6 +82,10 @@ export default function Memories({
           // If the full splat already loaded while we were fetching, stay hidden.
           if (splats.current.has(r.id)) pts.visible = false;
           previews.current.set(r.id, pts);
+          // Cache the splat's LOCAL bbox (geometry space, before placement) for
+          // the edit mode's corner markers + click picking.
+          pts.geometry.computeBoundingBox();
+          if (pts.geometry.boundingBox) setBounds(r.id, pts.geometry.boundingBox.clone());
           scene.add(pts);
         })
         .catch((err) => {
@@ -91,7 +100,8 @@ export default function Memories({
     return () => {
       ac.abort();
       activeFades.clear();
-      for (const pts of loadedPreviews.values()) {
+      for (const [id, pts] of loadedPreviews) {
+        clearBounds(id);
         scene.remove(pts);
         pts.geometry.dispose();
         (pts.material as THREE.Material).dispose();

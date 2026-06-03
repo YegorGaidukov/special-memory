@@ -140,7 +140,7 @@ export default function SplatWorld() {
           <FreeFly records={records} onArrive={setCurrent} />
         )}
       </Canvas>
-      <Crosshair />
+      {!editMode && <Crosshair />}
       {editMode ? (
         <div style={{ position: "fixed", inset: 0, pointerEvents: "none" }}>
           <EditHud
@@ -151,7 +151,7 @@ export default function SplatWorld() {
             saving={saving}
             saveError={saveError}
             selectedLabel={selectedId}
-            hint={selectedId ? "Loading memory…" : "Aim at a memory and click to select."}
+            hint={selectedId ? "Loading memory…" : "Click a memory to select it."}
             onDeselect={() => setSelectedId(null)}
             onExit={exitEdit}
           />
