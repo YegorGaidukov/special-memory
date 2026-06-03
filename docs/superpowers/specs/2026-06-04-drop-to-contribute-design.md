@@ -23,7 +23,7 @@ is purely a new front door to the same flow.
 
 1. The explorer (`/`) shows a small **persistent hint** in a bottom corner:
    *"Drag a photo here to add a memory."*
-2. Dragging any file over the window dims the view with a **full-window overlay**:
+2. Dragging any file over the window dims the view with a **small overlay**:
    *"Drop a photo to add a memory."*
 3. On **drop**: take the first file, validate it is `image/jpeg` or `image/png`,
    `POST` it as `FormData` (field name `photo`) to `/api/memories`, then
@@ -39,6 +39,7 @@ is purely a new front door to the same flow.
 ## Components / files
 
 ### New: `web/src/lib/upload/pickImage.ts` (pure, unit-tested)
+
 A single pure helper that isolates the only branching logic worth testing:
 
 ```
@@ -50,6 +51,7 @@ pickImage(files: FileList | File[]): { file: File } | { error: string }
 - Multi-file drops use the first file only (others ignored).
 
 ### New: `web/src/components/DropToContribute.tsx` (`"use client"`, manual seam)
+
 An HTML overlay component rendered as a sibling of `<ExplorerCanvas />`, matching the
 existing HUD-overlay pattern (`TravelOverlay`, `EditHud`). Responsibilities:
 
@@ -63,6 +65,7 @@ existing HUD-overlay pattern (`TravelOverlay`, `EditHud`). Responsibilities:
 - `preventDefault` on `dragover`/`drop` so the browser does not navigate to the file.
 
 ### Edit: `web/src/app/page.tsx`
+
 Add `<DropToContribute />` alongside `<ExplorerCanvas />`:
 
 ```tsx
@@ -73,6 +76,7 @@ Add `<DropToContribute />` alongside `<ExplorerCanvas />`:
 ```
 
 ### Delete: `web/src/app/contribute/page.tsx`
+
 The standalone upload landing page is removed. `/contribute/[id]` (placement) stays.
 
 ## Data flow

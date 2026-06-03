@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { ContribRecord } from "@/server/types";
 
 // Curator review queue: list every record with its lifecycle status, run ingest
@@ -37,7 +38,7 @@ export default function AdminPage() {
       {!records ? (
         <p>Loading…</p>
       ) : records.length === 0 ? (
-        <p>No memories yet. Add one at <a href="/contribute">/contribute</a>.</p>
+        <p>No memories yet. Add one by dropping a photo on the <Link href="/">explorer</Link>.</p>
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
