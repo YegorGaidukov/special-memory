@@ -18,7 +18,9 @@ export function placementTransform(
   origin: Geo,
   standoff: number,
 ): Transform {
-  if (input.geo) return geoToTransform(input.geo, origin, 0, 1);
+  if (input.geo && Number.isFinite(input.geo.lat) && Number.isFinite(input.geo.lon)) {
+    return geoToTransform(input.geo, origin, 0, 1);
+  }
 
   if (input.cameraPosition && input.cameraForward) {
     const [px, py, pz] = input.cameraPosition;

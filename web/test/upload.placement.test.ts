@@ -29,4 +29,28 @@ describe("placementTransform", () => {
     const t = placementTransform({}, ORIGIN, 10);
     expect(t.position).toEqual([0, 0, 0]);
   });
+
+  it("normalizes a diagonal forward vector across all axes", () => {
+    const s = 12;
+    const t = placementTransform(
+      { cameraPosition: [1, 2, 3], cameraForward: [1, 2, -2] }, // length 3
+      ORIGIN,
+      s,
+    );
+    // forward / 3 = [1/3, 2/3, -2/3], scaled by 12 = [4, 8, -8], added to [1,2,3].
+    expect(t.position[0]).toBeCloseTo(5, 6);
+    expect(t.position[1]).toBeCloseTo(10, 6);
+    expect(t.position[2]).toBeCloseTo(-5, 6);
+    expect(t.quaternion).toEqual([0, 0, 0, 1]);
+    expect(t.scale).toEqual([1, 1, 1]);
+  });
+
+  it("ignores geo with non-finite coordinates (falls back to camera-front)", () => {
+    const t = placementTransform(
+      { geo: { lat: NaN, lon: 0 }, cameraPosition: [0, 0, 0], cameraForward: [0, 0, -1] },
+      ORIGIN,
+      10,
+    );
+    expect(t.position).toEqual([0, 0, -10]);
+  });
 });
