@@ -3,10 +3,13 @@
 import { Canvas, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useManifest } from "@/hooks/useManifest";
+import { usePendingMemories } from "@/hooks/usePendingMemories";
+import { selectPending, hasUnpublishedApproved } from "@/lib/pending/select";
 import Navigation from "@/components/Navigation";
 import Travel from "@/components/Travel";
 import Memories from "@/components/Memories";
 import CameraPoseProbe from "@/components/CameraPoseProbe";
+import PendingSpheres from "@/components/PendingSpheres";
 import ExplorerEditor from "@/components/ExplorerEditor";
 import EditHud, { type Shortcut } from "@/components/EditHud";
 import TravelOverlay from "@/components/TravelOverlay";
@@ -37,7 +40,9 @@ function ContextLossLogger() {
 }
 
 export default function SplatWorld() {
-  const m = useManifest();
+  const [manifestVersion, setManifestVersion] = useState(0);
+  const m = useManifest(manifestVersion);
+  const storeRecords = usePendingMemories();
   const [current, setCurrent] = useState<MemoryRecord | null>(null);
   const baseRecords = m.status === "ready" ? m.manifest.memories : EMPTY;
 
@@ -60,6 +65,20 @@ export default function SplatWorld() {
   // (and on disk after save). Empty in the public fly-through → no-op identity.
   const [edits, setEdits] = useState<Record<string, StoredTransform>>({});
   const records = useMemo(() => applyEdits(baseRecords, edits), [baseRecords, edits]);
+
+  const manifestIds = useMemo(() => new Set(baseRecords.map((r) => r.id)), [baseRecords]);
+  const pending = useMemo(
+    () => selectPending(storeRecords, manifestIds),
+    [storeRecords, manifestIds],
+  );
+
+  // When the store has an approved memory the loaded manifest doesn't include
+  // yet, refetch so its splat loads (and its placeholder sphere drops out).
+  useEffect(() => {
+    if (hasUnpublishedApproved(storeRecords, manifestIds)) {
+      setManifestVersion((v) => v + 1);
+    }
+  }, [storeRecords, manifestIds]);
 
   // Mirror the selected memory's live transform into the overlay on every gizmo
   // drag / numeric edit (not just on save), so a memory that the camera cycles
@@ -169,6 +188,7 @@ export default function SplatWorld() {
             forceResidentId={editMode ? selectedId : null}
           />
         )}
+        <PendingSpheres records={pending} />
         <Navigation />
         {editMode ? (
           <ExplorerEditor

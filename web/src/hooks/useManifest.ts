@@ -15,7 +15,7 @@ export type ManifestState =
  * server component) so the whole explorer is one ssr:false unit and the
  * configurable base URL works the same for a local folder or a remote CDN.
  */
-export function useManifest(): ManifestState {
+export function useManifest(version: number = 0): ManifestState {
   const [state, setState] = useState<ManifestState>({ status: "loading" });
 
   useEffect(() => {
@@ -30,13 +30,12 @@ export function useManifest(): ManifestState {
         if (!cancelled) setState({ status: "ready", manifest });
       })
       .catch((err) => {
-        if (!cancelled)
-          setState({ status: "error", error: String(err?.message ?? err) });
+        if (!cancelled) setState({ status: "error", error: String(err?.message ?? err) });
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [version]);
 
   return state;
 }
