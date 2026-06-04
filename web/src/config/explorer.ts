@@ -1,5 +1,7 @@
 // Central explorer tuning. The base URL is the only place that knows where
 // memory assets live (dev public/ folder vs. a CDN for the exhibition).
+import { OSM_STYLE } from "@/lib/map/style";
+
 export const MEMORIES_BASE_URL =
   process.env.NEXT_PUBLIC_MEMORIES_BASE_URL ?? "/memories";
 
@@ -40,4 +42,17 @@ export const CITY = {
   name: "Wolfsburg",
   origin_lat: 52.4227,
   origin_lon: 10.7865,
+} as const;
+
+// Faint in-world map laid under the memories, aligned to the same geo projection.
+// Styling is config-only (no in-app restyle UI); the explorer toggles visibility.
+// `spanMeters` is the ground extent; `opacity`/`tint` make it "barely visible".
+export const MAP = {
+  enabled: true,
+  style: OSM_STYLE,
+  spanMeters: 4000,
+  textureSize: 2048,
+  opacity: 0.18,
+  tint: "#3a4a66",
+  y: 0,
 } as const;

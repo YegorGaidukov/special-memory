@@ -10,12 +10,14 @@ import Travel from "@/components/Travel";
 import Memories from "@/components/Memories";
 import CameraPoseProbe from "@/components/CameraPoseProbe";
 import PendingSpheres from "@/components/PendingSpheres";
+import MapGround from "@/components/MapGround";
 import ExplorerEditor from "@/components/ExplorerEditor";
 import EditHud, { type Shortcut } from "@/components/EditHud";
 import TravelOverlay from "@/components/TravelOverlay";
 import type { GizmoMode } from "@/components/Gizmo";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
 import { applyEdits } from "@/lib/transform/overlay";
+import { MAP } from "@/config/explorer";
 import { getResident } from "@/lib/splat/registry";
 import type { MemoryRecord } from "@/lib/manifest/types";
 import styles from "./SplatWorld.module.css";
@@ -41,6 +43,7 @@ function ContextLossLogger() {
 
 export default function SplatWorld() {
   const [manifestVersion, setManifestVersion] = useState(0);
+  const [mapVisible, setMapVisible] = useState<boolean>(MAP.enabled);
   const m = useManifest(manifestVersion);
   const storeRecords = usePendingMemories();
   const [current, setCurrent] = useState<MemoryRecord | null>(null);
@@ -135,6 +138,8 @@ export default function SplatWorld() {
         return;
       if (e.key === "e" || e.key === "E") {
         setEditMode((on) => !on);
+      } else if (e.key === "m" || e.key === "M") {
+        setMapVisible((v) => !v);
       } else if (editMode) {
         if (e.key === "g" || e.key === "G") setMode("translate");
         else if (e.key === "r" || e.key === "R") setMode("rotate");
@@ -190,6 +195,7 @@ export default function SplatWorld() {
         <color attach="background" args={["#05060a"]} />
         <ContextLossLogger />
         <CameraPoseProbe />
+        <MapGround visible={mapVisible} />
         {m.status === "ready" && (
           <Memories
             records={records}
@@ -229,10 +235,20 @@ export default function SplatWorld() {
           />
         </div>
       ) : (
-        <button className={styles.editToggle} onClick={() => setEditMode(true)}>
-          Edit placements
-          <span className={styles.editKbd}>E</span>
-        </button>
+        <>
+          <button className={styles.editToggle} onClick={() => setEditMode(true)}>
+            Edit placements
+            <span className={styles.editKbd}>E</span>
+          </button>
+          <button
+            className={styles.editToggle}
+            style={{ top: 56 }}
+            onClick={() => setMapVisible((v) => !v)}
+          >
+            {mapVisible ? "Hide map" : "Show map"}
+            <span className={styles.editKbd}>M</span>
+          </button>
+        </>
       )}
       {/* The fly-through chrome (title + WASD hint) doesn't apply in edit mode,
           and its title would collide with the inspector header. */}
