@@ -34,6 +34,10 @@ from pipeline.manifest import IMAGE_EXTS
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONVERT_SCRIPT = REPO_ROOT / "web" / "scripts" / "convert-splats.mjs"
 
+# localhost must never go through a system/corporate HTTP proxy (it would stall),
+# so all our local calls use an opener that ignores proxy settings.
+_LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def select_pending(inbox_stems, ready, in_flight):
     """Inbox stems with no produced .sog yet and not already being processed."""
@@ -85,9 +89,10 @@ def candidate_ports(env=None):
 
 def _probe_api(base_url):
     """True if base_url serves our memories API (GET returns a store with records).
-    Validating the body shape avoids latching onto an unrelated app on the port."""
+    Validating the body shape avoids latching onto an unrelated app on the port.
+    Short timeout so a dead/squatted port doesn't stall startup."""
     try:
-        with urllib.request.urlopen(f"{base_url}/api/memories", timeout=2) as r:
+        with _LOCAL.open(f"{base_url}/api/memories", timeout=1) as r:
             if r.status != 200:
                 return False
             body = json.loads(r.read().decode())
@@ -120,7 +125,7 @@ def post_json(url, payload=None):
     req = urllib.request.Request(
         url, data=data, method="POST", headers={"content-type": "application/json"}
     )
-    urllib.request.urlopen(req, timeout=15).close()
+    _LOCAL.open(req, timeout=15).close()
 
 
 def notify_ready(base_url, id):
