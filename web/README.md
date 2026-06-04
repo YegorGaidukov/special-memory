@@ -64,6 +64,7 @@ Shared in both the public fly-through and the curator edit mode (`Navigation`):
 - **Double-click** a memory to fly to it (any input cancels mid-flight).
 - Edit mode (**E**): **click** a memory to select it, **G/R/S** to move/rotate/scale
   with the gizmo.
+- **M** (or the corner button) toggles the faint Wolfsburg **map ground plane**.
 
 ## Architecture
 
@@ -82,7 +83,15 @@ is the single mocked seam, proven by the manual smoke test below — mirroring S
   `THREE.Points` cloud via Spark's `PlyReader`).
 - `components/` — the R3F canvas (`SplatWorld`), the residency loader
   (`Memories`), shared navigation (`Navigation` — orbit + WASD fly, both modes),
-  double-click travel (`Travel`), the travel HUD (`TravelOverlay`).
+  double-click travel (`Travel`), the travel HUD (`TravelOverlay`), the in-flight
+  placeholder spheres (`PendingSpheres`), and the faint map ground plane
+  (`MapGround`).
+- `lib/map` — the ground-plane pieces: `extent.ts` (span → world plane size +
+  lon/lat bbox, mirroring the geo projection; unit-tested), `style.ts` (the
+  swappable OSM `StyleSpecification`), and `groundTexture.ts` (the offscreen
+  MapLibre→`CanvasTexture` browser seam). Styling is config-only via `MAP` in
+  `config/explorer.ts` (opacity/tint/span/resolution); only visibility toggles at
+  runtime.
 
 `Memories` owns the per-memory level of detail: it loads a decimated
 `THREE.Points` preview for every record, then a throttled per-frame tick runs
@@ -137,35 +146,41 @@ memories on the laptop and the exhibition machine alike:
   our distance residency is the primary lever. Worth evaluating if individual
   resident splats ever become the bottleneck.
 
-## S3 — Contribution flow
+## S3 — Contribution flow (drop-to-splat)
 
-The curator-facing front door that feeds the explorer. The chosen city is
-**Wolfsburg** (origin 52.4227, 10.7865, in `config/explorer.ts` `CITY`).
+The contribution flow lives entirely **inside the explorer** — there are no
+separate placement or admin pages. Drop a photo and it becomes a geo-placed splat
+on its own; a faint placeholder sphere marks it while reconstruction runs in the
+background, and you keep flying. The chosen city is **Wolfsburg** (origin
+52.4227, 10.7865, in `config/explorer.ts` `CITY`).
 
 **The lifecycle:**
 
-1. **Upload** (drop on the explorer) — drop a city photo onto the main view. The
-   server saves the original under `data/uploads/`, copies it to the recon inbox
-   (`RECON_INBOX`, default `data/inbox/`), parses EXIF GPS/capture-time, and
-   creates a `processing` record.
-2. **Place** (`/contribute/[id]`) — a MapLibre map (key-free OSM tiles) drops a
-   pin from the photo's GPS (or Wolfsburg centre if none); drag it, set a facing
-   **heading** and a **scale** nudge, save. The server runs the geo math
-   (`lib/geo/*`) to compute the stored `transform`.
-3. **Reconstruct (auto, GPU-side watcher)** — dropping a photo on the explorer
-   auto-starts reconstruction: the upload is marked `processing`, and the GPU-side
-   watcher (`python -m pipeline.watch`, started by the curator in the conda `sharp`
-   env) reconstructs it, converts it to `.sog`, drops the assets into
-   `public/memories/`, and calls the `ingest` API so the placement page unlocks the
-   3D editor automatically. On error the watcher calls the `fail` API and moves the
-   image to `data/inbox/failed/`; re-drop the photo to retry. The web process still
-   never runs SHARP.
-4. **Ingest + approve** (`/admin`) — *Ingest splat* scans `public/memories` for
-   `<id>.sog` and flips the record to `ready`; *Approve* sets it `approved` and
-   **republishes** `public/memories/manifest.json` — **merging** the store's
-   approved records with any hand-authored entries already in the manifest (so
-   approving a contribution never wipes curated seed memories). The memory then
-   appears in the explorer at its real location.
+1. **Drop** (on the explorer) — drop a city photo onto the main view. The server
+   saves the original under `data/uploads/`, copies it to the recon inbox
+   (`RECON_INBOX`, default `data/inbox/`), parses EXIF, and creates a `processing`
+   record with its world `transform` **already computed**: EXIF GPS →
+   `geoToTransform` (the real Wolfsburg location); no GPS → a position in front of
+   the current camera (the client sends its live pose). No placement step.
+2. **Placeholder sphere** — the explorer polls the store (`GET /api/memories`) and
+   draws a faint wireframe sphere (`PendingSpheres`) at each in-flight memory's
+   position. You can keep exploring existing memories while it reconstructs.
+3. **Reconstruct (auto, GPU-side watcher)** — the GPU-side watcher
+   (`python -m pipeline.watch`, started by the curator in the conda `sharp` env)
+   picks the inbox copy up, reconstructs it, converts it to `.sog`, drops the
+   assets into `public/memories/`, and calls the `ingest` API. On error it calls
+   the `fail` API and moves the image to `data/inbox/failed/`; re-drop to retry.
+   The web process never runs SHARP.
+4. **Ingest auto-approves + publishes** — `POST /api/memories/[id]/ingest` flips
+   the record to `ready`, then immediately sets `approved` and **republishes**
+   `public/memories/manifest.json` (no admin gate). Publish **merges** the store's
+   approved records with any hand-authored entries already in the manifest, so
+   contributions never wipe curated seed memories. The explorer detects the new
+   approval on its next poll, refetches the manifest, the real splat loads, and the
+   placeholder sphere drops out.
+
+Fine-tuning placement (heading/scale/position) is done after the fact in the
+explorer's **edit mode** (`E` → click a memory → `G/R/S` gizmo → save).
 
 **Data & architecture:**
 
@@ -179,34 +194,36 @@ The curator-facing front door that feeds the explorer. The chosen city is
   lat/lon → local metres, East=+X / North=−Z), `lib/geo/heading.ts`
   (heading → yaw quaternion, matching the seed convention), and
   `lib/geo/transform.ts` (compose into a `transform`) are pure and unit-tested.
-  `lib/exif/placement.ts` normalises exifr output; `server/{store,publish,ingest}`
-  hold pure ops behind thin fs seams. **The Route Handlers
-  (`app/api/memories/**`) and the MapLibre canvas are the seams** — verified by a
-  manual smoke test, not unit tests (mirroring S2's WebGL seam).
+  `lib/upload/placement.ts` (EXIF-GPS-or-camera-front transform) and
+  `lib/pending/select.ts` (which records get placeholder spheres) are pure and
+  unit-tested too; `lib/exif/placement.ts` normalises exifr output;
+  `server/{store,publish,ingest}` hold pure ops behind thin fs seams. **The Route
+  Handlers (`app/api/memories/**`) are the seams** — verified manually, not unit
+  tested (mirroring S2's WebGL seam).
 - **No authentication** — this is a curated, locally-run installation, so the
-  contribution/admin routes and pages are intentionally open.
+  contribution routes are intentionally open.
 
 **Config:** `RECON_INBOX` (where uploads are copied for SHARP; point it at S1's
 input folder on the exhibition machine) — see `.env.local.example`.
 
 ### S3 smoke test (the spec's bar)
 
-> upload → EXIF placed → adjust → auto-reconstruct → approve → appears at the right
-> place/orientation.
+> drop → auto-placed (GPS or camera-front) → placeholder sphere → auto-reconstruct
+> → auto-publish → appears at the right place.
 
-The **backend** path (upload → place → ingest → approve → republish) is verified
+The **backend** path (drop → ingest → auto-approve → republish) is verified
 headlessly against a production build. The **browser** path needs a human:
 
 ```bash
 npm run build && npm run start   # then open http://localhost:3000
 ```
 
-- [ ] Drop a Wolfsburg photo onto the explorer (ideally one with GPS).
-- [ ] `/contribute/<id>` — the map shows a pin (auto-placed if the photo had GPS,
-      else Wolfsburg centre). Drag it, set heading + scale, **Save placement**.
-- [ ] Start the watcher (`python -m pipeline.watch`) on the GPU box; it will
-      reconstruct the inbox image and call `ingest` automatically. (To test the
+- [ ] Drop a Wolfsburg photo onto the explorer (ideally one with GPS). A faint
+      placeholder sphere appears (at the GPS location, or in front of the camera);
+      the top-right hint shows "Memory added — reconstructing…". You can keep flying.
+- [ ] Start the watcher (`python -m pipeline.watch`) on the GPU box; it
+      reconstructs the inbox image and calls `ingest` automatically. (To test the
       flow without a GPU, manually copy an existing seed `.sog`/`.preview.ply`/`.jpg`
-      to `public/memories/<id>.*` and then `ingest` via `/admin`.)
-- [ ] `/admin` — **Ingest splat** → `ready`; **Approve** → `approved`.
-- [ ] `/` — the new memory renders at its Wolfsburg location/orientation.
+      to `public/memories/<id>.*` and `POST` the `ingest` endpoint for that id.)
+- [ ] `/` — within a poll cycle the sphere is replaced by the splat at its
+      Wolfsburg location. Press **M** to toggle the faint map ground plane.

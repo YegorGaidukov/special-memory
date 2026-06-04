@@ -18,12 +18,15 @@ collective memory — dense where remembered, dreamlike at the edges.
 **Current state:** **S1, S2, and S3 are all built and unit-tested.**
 S1 is validated end-to-end on the laptop GPU (`pipeline/` + `tests/`; see `samples/README.md`).
 S2 lives in `web/` (Next.js + R3F + Spark splats); it renders the dark void, loads the seed
-memories upright, and supports free-fly + click-to-travel. S3 (also in `web/`) adds the contribution
-flow: upload → EXIF auto-placement → MapLibre pin/heading/scale → auto-reconstruct (watcher) →
-ingest → approve → publish. The web suite is **92 Vitest specs** (pure geo/manifest/store/publish/exif logic;
-the WebGL viewer, MapLibre canvas, and route handlers are the mocked/manual seams). **Verify on a
-production build** (`npm run build && npm run start`), not dev (HMR remounts the WebGL viewer and
-throws spurious errors). Build order was **S1 → S2 → S3**.
+memories upright, supports free-fly + click-to-travel, and shows a faint, `M`-toggleable Wolfsburg
+map ground plane. S3 (also in `web/`) is the **drop-to-splat** contribution flow, collapsed entirely
+into the explorer (no placement or admin pages): drop a photo → transform computed at upload (EXIF
+GPS, else in front of the camera) → faint placeholder sphere while the watcher reconstructs →
+`ingest` auto-approves + publishes → the splat replaces the sphere on the next poll. The web suite is
+**157 Vitest specs** (pure geo/manifest/store/publish/exif/upload/pending/map logic; the WebGL viewer,
+MapLibre→texture, and route handlers are the mocked/manual seams). **Verify on a production build**
+(`npm run build && npm run start`), not dev (HMR remounts the WebGL viewer and throws spurious
+errors). Build order was **S1 → S2 → S3**.
 
 ## Architecture (big picture)
 
@@ -54,14 +57,21 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   `PREVIEW.fadeMs`, animating `SplatMesh.opacity` 0→1 against the point cloud's 1→0) and disposes
   back to the point cloud past `disposeRadius` (Spark's race-free `initialized`/`dispose` lifecycle
   drives this from the tested `decideLod` in `src/lib/lod/`). Spark does the global splat sort.
-  **Deferred:** the starfield/grid, and Spark's built-in per-splat LOD (not needed yet).
-- **S3 — Contribution (web). [BUILT]** The contribution flow in `web/`: a curator adds a photo by
-  dropping it on the explorer, EXIF GPS auto-drops a MapLibre pin (`/contribute/[id]`) that they
-  drag + set a facing-heading + scale on, then review/ingest/approve in `/admin`. **S3 owns the geo math S2
-  deliberately omits** — `lib/geo/{project,heading,transform}` turns lat/lon + heading + scale into
-  the stored `transform` (equirectangular projection about the Wolfsburg origin; heading→yaw
-  quaternion matching the seed convention; all pure + unit-tested). State lives in a server-side
-  JSON **store** (`web/data/memories.json`, git-ignored) holding the full lifecycle
+  A faint, `M`-toggleable **map ground plane** (`MapGround` + `lib/map/*`) renders an offscreen
+  MapLibre OSM map once into a `THREE.CanvasTexture`, laid flat under the memories and aligned to the
+  same geo projection; styling is config-only via `config/explorer.MAP`. **Deferred:** the
+  starfield/grid, and Spark's built-in per-splat LOD (not needed yet).
+- **S3 — Contribution (web). [BUILT — drop-to-splat]** The contribution flow is collapsed entirely
+  into the explorer: **no `/contribute` or `/admin` pages.** A curator drops a photo on the explorer
+  and stays there; the upload route computes the stored `transform` immediately (`lib/upload/placement`:
+  EXIF GPS → `geoToTransform`, else a position in front of the live camera, whose pose a tiny in-Canvas
+  `CameraPoseProbe` bridges out to the DOM drop handler). A faint wireframe **placeholder sphere**
+  (`PendingSpheres`, fed by `lib/pending/select` over a poll of `GET /api/memories`) marks the in-flight
+  memory while the curator keeps exploring. **S3 owns the geo math S2 deliberately omits** —
+  `lib/geo/{project,heading,transform}` turns lat/lon + heading + scale into the stored `transform`
+  (equirectangular projection about the Wolfsburg origin; heading→yaw quaternion matching the seed
+  convention; all pure + unit-tested). State lives in a server-side JSON **store**
+  (`web/data/memories.json`, git-ignored) holding the full lifecycle
   (`uploaded → processing → ready → approved`); a pure **publish** step (`server/publish.ts`,
   `mergeManifest`) layers the store's `approved` records on top of any hand-authored manifest
   entries (curated seeds, kept by id) and writes `public/memories/manifest.json`, so the verified S2
@@ -69,13 +79,14 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   out of the web process** — the bridge is the filesystem: a drop copies the image to `RECON_INBOX`
   and marks the record `processing`, then a **watcher the curator runs on the GPU box**
   (`python -m pipeline.watch`, in the `sharp` env) reconstructs it, runs `convert-splats`, drops
-  `<id>.sog` into `public/memories/`, and calls the `ingest` API to flip the record to `ready`
-  (or the `fail` API on error). The web process still never runs SHARP.
-  Next.js 16 Route Handlers (`app/api/memories/**`) wire it together; the routes + MapLibre
-  canvas are the manual/seam-tested boundaries (a headless backend smoke test covers
-  upload→place→ingest→approve→publish). The city is **Wolfsburg** (`config/explorer.CITY`, origin
-  52.4227, 10.7865). **No authentication** — curated, locally-run installation, so the
-  contribution/admin routes are open by design.
+  `<id>.sog` into `public/memories/`, and calls the `ingest` API — which now **auto-approves +
+  republishes** in one step (no admin gate), so the explorer's next poll refetches the manifest, the
+  splat loads, and the placeholder sphere drops out (or the `fail` API on error). The web process still
+  never runs SHARP. Placement is fine-tuned afterwards in the explorer's **edit mode** (`E` → click →
+  `G/R/S` gizmo → save). Next.js 16 Route Handlers (`app/api/memories/**`) wire it together; the routes
+  are the manual/seam-tested boundaries. The city is **Wolfsburg** (`config/explorer.CITY`, origin
+  52.4227, 10.7865). **No authentication** — curated, locally-run installation, so the contribution
+  routes are open by design.
 
 **Memory record (the contract between subsystems):** `id, status, source_image, splat_path,
 thumbnail_path, captured_at, geo{lat,lon}, heading_deg, transform{position[x,y,z], quaternion,
