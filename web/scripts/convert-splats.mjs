@@ -20,7 +20,7 @@
 // file; ~4000 reads as a recognisable cloud at ~220KB.
 const PREVIEW_POINTS = 4000;
 
-import { readdirSync, statSync, mkdirSync, existsSync } from "node:fs";
+import { readdirSync, statSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -28,6 +28,19 @@ import { fileURLToPath } from "node:url";
 const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const inputDir = process.argv[2] ?? join(webRoot, "public", "memories");
 const outputDir = process.argv[3] ?? inputDir;
+
+// Resolve splat-transform's JS entry so we can run it via `node` directly. Node
+// >=18.20/20.12 refuses to spawn the `npx.cmd` shim without `shell: true`
+// (EINVAL, CVE-2024-27980), and we want to keep passing args as argv slots — no
+// shell parsing means a `.ply` filename can't be re-parsed/injected. We read the
+// package.json as a plain file (its `exports` map blocks require.resolve of it).
+const stDir = join(webRoot, "node_modules", "@playcanvas", "splat-transform");
+const stBin = JSON.parse(readFileSync(join(stDir, "package.json"), "utf8")).bin;
+const stCli = join(stDir, typeof stBin === "string" ? stBin : stBin["splat-transform"]);
+if (!existsSync(stCli)) {
+  console.error(`[convert-splats] splat-transform CLI not found at ${stCli} — run \`npm install\` in web/.`);
+  process.exit(1);
+}
 
 if (!existsSync(inputDir)) {
   console.error(`[convert-splats] input dir not found: ${inputDir}`);
@@ -59,11 +72,8 @@ for (const ply of plys) {
       skipped++;
       continue;
     }
-    // No `shell: true`: args are passed straight to the child as argv slots, so a
-    // `.ply` filename containing shell metacharacters can't be re-parsed/injected.
-    // Windows needs the `.cmd` shim to resolve `npx` without a shell.
-    const npx = process.platform === "win32" ? "npx.cmd" : "npx";
-    const res = spawnSync(npx, ["splat-transform", src, ...actions, out], {
+    // Run the resolved CLI with the current node binary (no .cmd shim, no shell).
+    const res = spawnSync(process.execPath, [stCli, src, ...actions, out], {
       cwd: webRoot,
       stdio: "inherit",
     });
