@@ -6,6 +6,7 @@ import { useManifest } from "@/hooks/useManifest";
 import Navigation from "@/components/Navigation";
 import Travel from "@/components/Travel";
 import Memories from "@/components/Memories";
+import CameraPoseProbe from "@/components/CameraPoseProbe";
 import ExplorerEditor from "@/components/ExplorerEditor";
 import EditHud, { type Shortcut } from "@/components/EditHud";
 import TravelOverlay from "@/components/TravelOverlay";
@@ -161,6 +162,7 @@ export default function SplatWorld() {
       >
         <color attach="background" args={["#05060a"]} />
         <ContextLossLogger />
+        <CameraPoseProbe />
         {m.status === "ready" && (
           <Memories
             records={records}

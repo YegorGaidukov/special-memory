@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { pickImage } from "@/lib/upload/pickImage";
+import { getCameraPose } from "@/lib/camera/pose";
 
 // DOM overlay over the explorer canvas: the only entry point for adding a memory.
-// Drop a photo anywhere on the window → upload via POST /api/memories → jump to the
-// placement map (/contribute/<id>). Drag/drop + fetch are the manual seam; the pure
-// file-selection logic lives in lib/upload/pickImage (unit-tested).
+// Drop a photo anywhere on the window → upload via POST /api/memories → stay on
+// the explorer. The new memory's placeholder sphere appears (SplatWorld polls the
+// store) and becomes a splat when reconstruction publishes it. We send the live
+// camera pose so a GPS-less photo lands in front of the current view.
 //
 // Pointer-lock note: during free-fly the cursor is OS-captured and browsers don't
 // fire file-drop events, so this is naturally inert while flying — no extra code.
@@ -19,7 +20,7 @@ const panel: React.CSSProperties = {
   zIndex: 10,
 };
 
-type Status = "idle" | "uploading" | "error";
+type Status = "idle" | "uploading" | "done" | "error";
 
 // A drag carries files only when its types list includes "Files" (vs. dragging
 // selected text or a link). Keeps the overlay from flashing on non-file drags.
@@ -28,7 +29,6 @@ function hasFiles(dt: DataTransfer | null): boolean {
 }
 
 export default function DropToContribute() {
-  const router = useRouter();
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -36,30 +36,31 @@ export default function DropToContribute() {
   // clears when the cursor actually leaves the window.
   const depth = useRef(0);
 
-  const upload = useCallback(
-    async (files: FileList) => {
-      const picked = pickImage(files);
-      if ("error" in picked) {
-        setStatus("error");
-        setError(picked.error);
-        return;
-      }
-      setStatus("uploading");
-      setError(null);
-      try {
-        const form = new FormData();
-        form.append("photo", picked.file);
-        const r = await fetch("/api/memories", { method: "POST", body: form });
-        if (!r.ok) throw new Error(await r.text());
-        const { record } = await r.json();
-        router.push(`/contribute/${record.id}`);
-      } catch (err) {
-        setStatus("error");
-        setError(String(err instanceof Error ? err.message : err));
-      }
-    },
-    [router],
-  );
+  const upload = useCallback(async (files: FileList) => {
+    const picked = pickImage(files);
+    if ("error" in picked) {
+      setStatus("error");
+      setError(picked.error);
+      return;
+    }
+    setStatus("uploading");
+    setError(null);
+    try {
+      const pose = getCameraPose();
+      const form = new FormData();
+      form.append("photo", picked.file);
+      form.append("camera_position", JSON.stringify(pose.position));
+      form.append("camera_forward", JSON.stringify(pose.forward));
+      const r = await fetch("/api/memories", { method: "POST", body: form });
+      if (!r.ok) throw new Error(await r.text());
+      setStatus("done");
+      // Clear the confirmation after a few seconds.
+      setTimeout(() => setStatus("idle"), 4000);
+    } catch (err) {
+      setStatus("error");
+      setError(String(err instanceof Error ? err.message : err));
+    }
+  }, []);
 
   useEffect(() => {
     const onEnter = (e: DragEvent) => {
@@ -97,10 +98,11 @@ export default function DropToContribute() {
 
   return (
     <>
-      {/* Persistent hint — top-right corner (bottom corners hold the explorer HUD). */}
+      {/* Persistent hint / status — top-right corner. */}
       <div style={{ ...panel, top: 14, right: 16, color: "var(--ink-mute)", textAlign: "right" }}>
         {status === "idle" && "Drag a photo here to add a memory"}
         {status === "uploading" && "Uploading…"}
+        {status === "done" && "Memory added — reconstructing…"}
         {status === "error" && <span style={{ color: "#ff8080" }}>{error}</span>}
       </div>
 
