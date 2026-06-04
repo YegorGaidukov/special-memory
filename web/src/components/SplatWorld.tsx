@@ -73,10 +73,18 @@ export default function SplatWorld() {
   );
 
   // When the store has an approved memory the loaded manifest doesn't include
-  // yet, refetch so its splat loads (and its placeholder sphere drops out).
+  // yet, refetch so its splat loads (and its placeholder sphere drops out). The
+  // ref guards against a redundant bump cascade if a slow manifest fetch hasn't
+  // resolved before the next store poll: bump once, then wait for the refetch to
+  // land (manifestIds gains the id → no longer stale) before allowing another.
+  const refetching = useRef(false);
   useEffect(() => {
-    if (hasUnpublishedApproved(storeRecords, manifestIds)) {
+    const stale = hasUnpublishedApproved(storeRecords, manifestIds);
+    if (stale && !refetching.current) {
+      refetching.current = true;
       setManifestVersion((v) => v + 1);
+    } else if (!stale) {
+      refetching.current = false;
     }
   }, [storeRecords, manifestIds]);
 
