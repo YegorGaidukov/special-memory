@@ -5,19 +5,41 @@ import { loadStore, saveStore, addRecord } from "@/server/store";
 import { parsePlacement } from "@/server/exif";
 import { makeRecordId, extOf } from "@/server/id";
 import { UPLOADS_DIR, RECON_INBOX } from "@/server/paths";
+import { placementTransform } from "@/lib/upload/placement";
+import { CITY, FLY_TO_STANDOFF } from "@/config/explorer";
+import type { Vec3 } from "@/lib/manifest/types";
 import type { ContribRecord } from "@/server/types";
 
 export const runtime = "nodejs";
 
-// GET /api/memories — list all records (curator review queue). Open (no auth).
+const ORIGIN = { lat: CITY.origin_lat, lon: CITY.origin_lon };
+
+// GET /api/memories — list all records (drives placeholder spheres + refetch).
 export async function GET() {
   const store = await loadStore();
   return Response.json(store);
 }
 
+// A form field carrying a Vec3 as JSON (e.g. "[0,5,-10]"). Returns undefined for
+// missing/invalid input so placement falls back cleanly.
+function parseVec3(form: FormData, key: string): Vec3 | undefined {
+  const raw = form.get(key);
+  if (typeof raw !== "string") return undefined;
+  try {
+    const v = JSON.parse(raw);
+    if (Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === "number" && Number.isFinite(n))) {
+      return [v[0], v[1], v[2]];
+    }
+  } catch {
+    /* fall through */
+  }
+  return undefined;
+}
+
 // POST /api/memories — multipart upload. Saves the original, copies it to the
-// recon inbox for the GPU watcher's SHARP run, parses EXIF for an initial
-// placement, and creates a `processing` record (the watcher takes it from here).
+// recon inbox for the GPU watcher, parses EXIF, and creates a `processing`
+// record with its world transform already set (EXIF GPS, else the camera-front
+// position the client sent). No placement page — the watcher takes it from here.
 // Open (no auth).
 export async function POST(request: NextRequest) {
   const form = await request.formData();
@@ -36,19 +58,27 @@ export async function POST(request: NextRequest) {
   await writeFile(join(RECON_INBOX, filename), buffer);
 
   const placement = await parsePlacement(buffer);
+  const transform = placementTransform(
+    {
+      geo: placement.geo,
+      cameraPosition: parseVec3(form, "camera_position"),
+      cameraForward: parseVec3(form, "camera_forward"),
+    },
+    ORIGIN,
+    FLY_TO_STANDOFF,
+  );
 
   const record: ContribRecord = {
     id,
     // Reconstruction is auto-triggered (the GPU watcher picks the inbox copy up),
-    // so a fresh upload is already "processing", not merely "uploaded".
+    // so a fresh upload is already "processing".
     status: "processing",
     source_image: filename,
     thumbnail_url: "",
     splat_url: "",
-    // Placeholder transform until the curator places it. The store holds it; it
-    // is NOT published until approved, so the explorer never sees it.
-    transform: { position: [0, 0, 0], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] },
+    transform,
     geo: placement.geo,
+    heading_deg: placement.geo ? 0 : undefined,
     captured_at: placement.captured_at,
     created_at: new Date().toISOString(),
   };
