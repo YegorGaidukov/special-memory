@@ -65,9 +65,9 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   into the explorer: **no `/contribute` or `/admin` pages.** A curator drops a photo on the explorer
   and stays there; the upload route computes the stored `transform` immediately (`lib/upload/placement`:
   EXIF GPS → `geoToTransform`, else a position in front of the live camera, whose pose a tiny in-Canvas
-  `CameraPoseProbe` bridges out to the DOM drop handler). A faint wireframe **placeholder sphere**
-  (`PendingSpheres`, fed by `lib/pending/select` over a poll of `GET /api/memories`) marks the in-flight
-  memory while the curator keeps exploring. **S3 owns the geo math S2 deliberately omits** —
+  `CameraPoseProbe` bridges out to the DOM drop handler). A faint pulsing **placeholder ring**
+  (`PendingSpheres`, a flat HTML outline marker — not a mesh — fed by `lib/pending/select` over a poll of
+  `GET /api/memories`) marks the in-flight memory while the curator keeps exploring. **S3 owns the geo math S2 deliberately omits** —
   `lib/geo/{project,heading,transform}` turns lat/lon + heading + scale into the stored `transform`
   (equirectangular projection about the Wolfsburg origin; heading→yaw quaternion matching the seed
   convention; all pure + unit-tested). State lives in a server-side JSON **store**

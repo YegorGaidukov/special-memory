@@ -14,6 +14,13 @@ export type ManifestState =
  * Fetch + parse the explorer manifest on the client. Kept client-side (not in a
  * server component) so the whole explorer is one ssr:false unit and the
  * configurable base URL works the same for a local folder or a remote CDN.
+ *
+ * Bumping `version` re-runs the fetch (used to pick up a just-published memory).
+ * NOTE: the effect intentionally does NOT reset state to `{ status: "loading" }`
+ * on a refetch — keeping the previous `ready` manifest on screen means `Memories`
+ * stays mounted (no flicker) AND the caller's refetch guard keeps working: the
+ * old `manifestIds` stays stable until the new manifest lands, so it won't bump
+ * `version` again mid-flight. Don't "fix" this by resetting to loading here.
  */
 export function useManifest(version: number = 0): ManifestState {
   const [state, setState] = useState<ManifestState>({ status: "loading" });

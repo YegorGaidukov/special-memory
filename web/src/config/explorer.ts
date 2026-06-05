@@ -51,7 +51,7 @@ export const MAP = {
   enabled: true,
   style: OSM_STYLE,
   spanMeters: 4000,
-  textureSize: 2048,
+  textureSize: 4096,
   opacity: 0.18,
   tint: "#3a4a66",
   y: 0,

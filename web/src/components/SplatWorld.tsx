@@ -190,7 +190,7 @@ export default function SplatWorld() {
         // it. The fill-rate cost is negligible at this scale; revisit if the
         // fly-through ever runs hundreds of splats (a deferred concern).
         gl={{ antialias: true }}
-        camera={{ position: [0, 12, 70], fov: 60, near: 0.1, far: 3000 }}
+        camera={{ position: [0, 12, 70], fov: 60, near: 0.1, far: 20000 }}
       >
         <color attach="background" args={["#05060a"]} />
         <ContextLossLogger />

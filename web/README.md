@@ -84,8 +84,8 @@ is the single mocked seam, proven by the manual smoke test below — mirroring S
 - `components/` — the R3F canvas (`SplatWorld`), the residency loader
   (`Memories`), shared navigation (`Navigation` — orbit + WASD fly, both modes),
   double-click travel (`Travel`), the travel HUD (`TravelOverlay`), the in-flight
-  placeholder spheres (`PendingSpheres`), and the faint map ground plane
-  (`MapGround`).
+  placeholder markers (`PendingSpheres` — flat HTML outline rings, not meshes),
+  and the faint map ground plane (`MapGround`).
 - `lib/map` — the ground-plane pieces: `extent.ts` (span → world plane size +
   lon/lat bbox, mirroring the geo projection; unit-tested), `style.ts` (the
   swappable OSM `StyleSpecification`), and `groundTexture.ts` (the offscreen
@@ -219,7 +219,7 @@ npm run build && npm run start   # then open http://localhost:3000
 ```
 
 - [ ] Drop a Wolfsburg photo onto the explorer (ideally one with GPS). A faint
-      placeholder sphere appears (at the GPS location, or in front of the camera);
+      pulsing ring marker appears (at the GPS location, or in front of the camera);
       the top-right hint shows "Memory added — reconstructing…". You can keep flying.
 - [ ] Start the watcher (`python -m pipeline.watch`) on the GPU box; it
       reconstructs the inbox image and calls `ingest` automatically. (To test the
