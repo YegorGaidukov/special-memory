@@ -26,8 +26,12 @@ canvas); a bottom-centre **"share a memory"** button (+ drag-and-drop) is the up
 contribution flow, collapsed entirely
 into the explorer (no placement or admin pages): drop a photo → transform computed at upload (EXIF
 GPS, else in front of the camera) → faint placeholder sphere while the watcher reconstructs →
-`ingest` auto-approves + publishes → the splat replaces the sphere on the next poll. The web suite is
-**157 Vitest specs** (pure geo/manifest/store/publish/exif/upload/pending/map logic; the WebGL viewer,
+`ingest` auto-approves + publishes → the splat replaces the sphere on the next poll. Memory assets are
+served by a **dynamic route** (`app/api/asset/[name]`), not Next's static `public/` handler — Next only
+serves `public/` files that existed at *build* time, so a live drop's runtime-written `.sog` would 404
+on `next start`; the route reads `PUBLIC_MEMORIES_DIR` from disk per request (`MEMORIES_BASE_URL`
+defaults to `/api/asset`). The web suite is **163 Vitest specs** (pure
+geo/manifest/store/publish/exif/upload/pending/map/asset logic; the WebGL viewer,
 MapLibre→texture, and route handlers are the mocked/manual seams). **Verify on a production build**
 (`npm run build && npm run start`), not dev (HMR remounts the WebGL viewer and throws spurious
 errors). Build order was **S1 → S2 → S3**.
@@ -88,8 +92,9 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   splat loads, and the placeholder sphere drops out (or the `fail` API on error). The web process still
   never runs SHARP. Placement is fine-tuned afterwards in the explorer's **edit mode** (toolbar Edit
   icon → click → drag the unified gumball gizmo; auto-saves; `Esc` exits). Next.js 16 Route Handlers
-  (`app/api/memories/**`) wire it together; the routes
-  are the manual/seam-tested boundaries. The city is **Wolfsburg** (`config/explorer.CITY`, origin
+  (`app/api/memories/**`, plus the dynamic asset route `app/api/asset/[name]` that serves the
+  runtime-written splats — see above) wire it together; the routes
+  are the manual/seam-tested boundaries (their pure cores, e.g. `server/asset.ts`, are unit-tested). The city is **Wolfsburg** (`config/explorer.CITY`, origin
   52.4227, 10.7865). **No authentication** — curated, locally-run installation, so the contribution
   routes are open by design.
 

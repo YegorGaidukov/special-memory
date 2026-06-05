@@ -51,9 +51,22 @@ npm test         # unit tests (Vitest)
 
 ## Configuration
 
-`NEXT_PUBLIC_MEMORIES_BASE_URL` (default `/memories`) is the only place that
+`NEXT_PUBLIC_MEMORIES_BASE_URL` (default `/api/asset`) is the only place that
 knows where assets live — point it at a static host / CDN for deployment without
 touching code. See `.env.local.example`.
+
+### Why a dynamic asset route (not `public/`)
+
+Memory assets (`.sog` / `.preview.ply` / `.jpg` / `manifest.json`) live on disk
+in `public/memories/`, but they are **not** served by Next's static `public/`
+handler. Next only serves `public/` files that existed at **build time**, so the
+splats a live drop produces *after* `next build` would 404 on `next start` (you'd
+see the placeholder ring but never the splat). Instead, `app/api/asset/[name]`
+reads `PUBLIC_MEMORIES_DIR` from disk **per request** (`force-dynamic`), so every
+runtime-written asset is served immediately — no rebuild per contribution. The
+filename safety (no traversal / sub-dirs) is the unit-tested `server/asset.ts`
+(`safeAssetName`/`assetContentType`); the `fs` read is the route's seam. The
+route is same-origin, so Spark's COOP/COEP isolation still holds.
 
 ## Controls
 
@@ -215,8 +228,9 @@ gizmo; auto-saves; **Esc** exits).
   `lib/pending/select.ts` (which records get placeholder spheres) are pure and
   unit-tested too; `lib/exif/placement.ts` normalises exifr output;
   `server/{store,publish,ingest}` hold pure ops behind thin fs seams. **The Route
-  Handlers (`app/api/memories/**`) are the seams** — verified manually, not unit
-  tested (mirroring S2's WebGL seam).
+  Handlers (`app/api/memories/**`, plus the asset route `app/api/asset/[name]`)
+  are the seams** — verified manually, not unit tested (mirroring S2's WebGL
+  seam); their pure cores (`server/asset.ts` etc.) are unit-tested.
 - **No authentication** — this is a curated, locally-run installation, so the
   contribution routes are intentionally open.
 

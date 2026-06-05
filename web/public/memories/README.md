@@ -1,8 +1,13 @@
-# `public/memories/` — explorer asset folder (dev)
+# `public/memories/` — explorer asset folder
 
-This is the **dev static host** for memory assets. In dev, `NEXT_PUBLIC_MEMORIES_BASE_URL`
-defaults to `/memories`, so files here are served at `http://localhost:3000/memories/<file>`.
-For the exhibition this base URL can point at a static host / CDN instead — no code change.
+The on-disk home for memory assets (splats, previews, thumbnails, `manifest.json`).
+These are **not** served by Next's static `public/` handler — that only exposes
+files present at build time, so a live drop's runtime-written `.sog` would 404.
+Instead they're streamed from this directory by the dynamic route
+`app/api/asset/[name]` (`PUBLIC_MEMORIES_DIR`), so `NEXT_PUBLIC_MEMORIES_BASE_URL`
+defaults to `/api/asset` and files here are served at
+`http://localhost:3000/api/asset/<file>`. For the exhibition this base URL can
+point at a static host / CDN instead — no code change.
 
 ## What's tracked vs. local
 
