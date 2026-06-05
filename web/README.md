@@ -57,14 +57,26 @@ touching code. See `.env.local.example`.
 
 ## Controls
 
-Shared in both the public fly-through and the curator edit mode (`Navigation`):
+Camera, shared in both the public fly-through and the curator edit mode (`Navigation`):
 
 - **Left-drag** to look/orbit, **right-drag** to pan, **scroll** to zoom.
 - **WASD** to fly in the direction you're looking (**Shift** to boost).
 - **Double-click** a memory to fly to it (any input cancels mid-flight).
-- Edit mode (**E**): **click** a memory to select it, **G/R/S** to move/rotate/scale
-  with the gizmo.
-- **M** (or the corner button) toggles the faint Wolfsburg **map ground plane**.
+
+On-screen chrome — icons only, **no keyboard shortcuts**:
+
+- A slim **right-edge toolbar** (`Toolbar`): **Edit** (enter placement edit mode),
+  **Map** (toggle the faint Wolfsburg map ground plane), **Library** (open the memory
+  list). Hidden while editing.
+- **Library** (`Library`) — a list of every memory (id + date); click one to fly to it.
+- **"share a memory"** button (bottom-centre) opens a file picker to add a photo;
+  dragging a photo anywhere on the window still works too.
+- A **dark/light theme** toggle (top-right) flips the whole view, including the 3D
+  background. The choice persists (localStorage) and is set pre-paint to avoid a flash.
+
+In **edit mode**: **click** a memory to select it, then drag the unified gumball gizmo
+to move/rotate/scale it (changes **auto-save** — no Save button). **Esc** exits edit
+mode. The numeric position/heading/scale inspector appears only once a memory is selected.
 
 ## Architecture
 
@@ -83,9 +95,13 @@ is the single mocked seam, proven by the manual smoke test below — mirroring S
   `THREE.Points` cloud via Spark's `PlyReader`).
 - `components/` — the R3F canvas (`SplatWorld`), the residency loader
   (`Memories`), shared navigation (`Navigation` — orbit + WASD fly, both modes),
-  double-click travel (`Travel`), the travel HUD (`TravelOverlay`), the in-flight
-  placeholder markers (`PendingSpheres` — flat HTML outline rings, not meshes),
-  and the faint map ground plane (`MapGround`).
+  double-click + library-driven travel (`Travel`), the right-edge icon toolbar
+  (`Toolbar`) and memory list (`Library`), the dark/light theme switch
+  (`ThemeToggle` + `hooks/useTheme`), the upload entry (`DropToContribute` — the
+  "share a memory" button + drag-and-drop), the in-flight placeholder markers
+  (`PendingSpheres` — flat HTML outline rings, not meshes), and the faint map
+  ground plane (`MapGround`). Geist (sans + mono) is the typeface, self-hosted via
+  `next/font`; UI surfaces read theme-aware tokens from `app/globals.css`.
 - `lib/map` — the ground-plane pieces: `extent.ts` (span → world plane size +
   lon/lat bbox, mirroring the geo projection; unit-tested), `style.ts` (the
   swappable OSM `StyleSpecification`), and `groundTexture.ts` (the offscreen
@@ -180,7 +196,8 @@ background, and you keep flying. The chosen city is **Wolfsburg** (origin
    placeholder sphere drops out.
 
 Fine-tuning placement (heading/scale/position) is done after the fact in the
-explorer's **edit mode** (`E` → click a memory → `G/R/S` gizmo → save).
+explorer's **edit mode** (toolbar **Edit** icon → click a memory → drag the gumball
+gizmo; auto-saves; **Esc** exits).
 
 **Data & architecture:**
 
@@ -218,12 +235,14 @@ headlessly against a production build. The **browser** path needs a human:
 npm run build && npm run start   # then open http://localhost:3000
 ```
 
-- [ ] Drop a Wolfsburg photo onto the explorer (ideally one with GPS). A faint
-      pulsing ring marker appears (at the GPS location, or in front of the camera);
-      the top-right hint shows "Memory added — reconstructing…". You can keep flying.
+- [ ] Drop a Wolfsburg photo onto the explorer (ideally one with GPS), or use the
+      **share a memory** button. A faint pulsing ring marker appears (at the GPS
+      location, or in front of the camera); a status line above the share button
+      shows "Memory added — reconstructing…". You can keep flying.
 - [ ] Start the watcher (`python -m pipeline.watch`) on the GPU box; it
       reconstructs the inbox image and calls `ingest` automatically. (To test the
       flow without a GPU, manually copy an existing seed `.sog`/`.preview.ply`/`.jpg`
       to `public/memories/<id>.*` and `POST` the `ingest` endpoint for that id.)
 - [ ] `/` — within a poll cycle the sphere is replaced by the splat at its
-      Wolfsburg location. Press **M** to toggle the faint map ground plane.
+      Wolfsburg location. Use the toolbar **Map** icon to toggle the faint map
+      ground plane.

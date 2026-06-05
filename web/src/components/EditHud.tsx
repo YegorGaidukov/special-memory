@@ -5,18 +5,13 @@ import type { StoredTransform } from "@/lib/transform/apply";
 import { headingToQuaternion, quaternionToHeadingDeg } from "@/lib/geo/heading";
 import styles from "./EditHud.module.css";
 
-/** A shortcut hint shown in the empty state (when nothing is selected). */
-export interface Shortcut {
-  keys: string[];
-  label: string;
-}
-
 /**
  * Glass inspector (DOM overlay outside the canvas) for the transform editor:
- * editable position/heading/scale fields, and Save. The in-canvas gumball gizmo
- * handles move/rotate/scale directly, so there's no mode switch here.
- * Presentational — the parent owns the selected object, applies edits to the
- * live mesh (`onEditTransform`), and persists (`onSave`).
+ * editable position/heading/scale fields. The in-canvas gumball gizmo handles
+ * move/rotate/scale directly, so there's no mode switch here. Renders nothing
+ * until a memory is selected (no empty-state card) — the panel only appears with
+ * a live transform to edit. Presentational — the parent owns the selected object,
+ * applies edits to the live mesh (`onEditTransform`), and auto-persists.
  */
 export default function EditHud({
   transform,
@@ -25,8 +20,6 @@ export default function EditHud({
   saveError,
   savedAt,
   selectedLabel,
-  hint,
-  shortcuts,
   onExit,
 }: {
   transform: StoredTransform | null;
@@ -35,8 +28,6 @@ export default function EditHud({
   saveError?: string | null;
   savedAt?: number | null;
   selectedLabel?: string | null;
-  hint?: string | null;
-  shortcuts?: Shortcut[];
   onExit?: () => void;
 }) {
   // Editing helpers: build the next stored transform from a single edited value.
@@ -58,6 +49,9 @@ export default function EditHud({
 
   const editable = Boolean(transform && onEditTransform);
 
+  // No empty-state card: until a memory is selected the inspector isn't shown.
+  if (!transform) return null;
+
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
@@ -70,9 +64,7 @@ export default function EditHud({
         )}
       </div>
 
-      {transform ? (
-        <>
-          <div className={styles.fields}>
+      <div className={styles.fields}>
             <div className={styles.row}>
               <span className={styles.rowLabel}>Position</span>
               <div className={styles.rowFields}>
@@ -123,34 +115,12 @@ export default function EditHud({
             </div>
           </div>
 
-          <StatusLine
-            saving={saving}
-            savedAt={savedAt}
-            saveError={saveError}
-            selectedLabel={selectedLabel}
-          />
-        </>
-      ) : (
-        <div className={styles.empty}>
-          <span>{hint ?? "Select a memory to edit its placement."}</span>
-          {shortcuts && shortcuts.length > 0 && (
-            <div className={styles.legend}>
-              {shortcuts.map((s) => (
-                <div key={s.label} className={styles.legendRow}>
-                  <span className={styles.kbdGroup}>
-                    {s.keys.map((k) => (
-                      <kbd key={k} className={styles.kbd}>
-                        {k}
-                      </kbd>
-                    ))}
-                  </span>
-                  <span>{s.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <StatusLine
+        saving={saving}
+        savedAt={savedAt}
+        saveError={saveError}
+        selectedLabel={selectedLabel}
+      />
     </div>
   );
 }

@@ -1,0 +1,34 @@
+/* Dark/light switch — standalone glass icon button, top-right. Token-styled so it
+   inverts with the theme like the toolbar and share button. */
+.toggle {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  z-index: 11;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow-panel);
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color 150ms var(--ease-out), border-color 150ms var(--ease-out),
+    transform 100ms var(--ease-out);
+}
+.toggle:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.toggle:active {
+  transform: translateY(1px);
+}
+.toggle svg {
+  transition: color 200ms var(--ease-out);
+}

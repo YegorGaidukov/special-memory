@@ -18,8 +18,12 @@ collective memory — dense where remembered, dreamlike at the edges.
 **Current state:** **S1, S2, and S3 are all built and unit-tested.**
 S1 is validated end-to-end on the laptop GPU (`pipeline/` + `tests/`; see `samples/README.md`).
 S2 lives in `web/` (Next.js + R3F + Spark splats); it renders the dark void, loads the seed
-memories upright, supports free-fly + click-to-travel, and shows a faint, `M`-toggleable Wolfsburg
-map ground plane. S3 (also in `web/`) is the **drop-to-splat** contribution flow, collapsed entirely
+memories upright, supports free-fly + click-to-travel, and shows a faint Wolfsburg map ground plane
+toggled from a slim right-edge **icon toolbar** (Edit / Map / Library — no keyboard shortcuts). The
+chrome is Geist-typed and has a top-right **dark/light theme** toggle (flips the whole view incl. the
+canvas); a bottom-centre **"share a memory"** button (+ drag-and-drop) is the upload entry, and the
+**Library** icon opens a click-to-travel memory list. S3 (also in `web/`) is the **drop-to-splat**
+contribution flow, collapsed entirely
 into the explorer (no placement or admin pages): drop a photo → transform computed at upload (EXIF
 GPS, else in front of the camera) → faint placeholder sphere while the watcher reconstructs →
 `ingest` auto-approves + publishes → the splat replaces the sphere on the next poll. The web suite is
@@ -57,7 +61,7 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   `PREVIEW.fadeMs`, animating `SplatMesh.opacity` 0→1 against the point cloud's 1→0) and disposes
   back to the point cloud past `disposeRadius` (Spark's race-free `initialized`/`dispose` lifecycle
   drives this from the tested `decideLod` in `src/lib/lod/`). Spark does the global splat sort.
-  A faint, `M`-toggleable **map ground plane** (`MapGround` + `lib/map/*`) renders an offscreen
+  A faint, toolbar-toggleable **map ground plane** (`MapGround` + `lib/map/*`) renders an offscreen
   MapLibre OSM map once into a `THREE.CanvasTexture`, laid flat under the memories and aligned to the
   same geo projection; styling is config-only via `config/explorer.MAP`. **Deferred:** the
   starfield/grid, and Spark's built-in per-splat LOD (not needed yet).
@@ -82,8 +86,9 @@ real-world coordinate space. The system is three loosely-coupled subsystems link
   `<id>.sog` into `public/memories/`, and calls the `ingest` API — which now **auto-approves +
   republishes** in one step (no admin gate), so the explorer's next poll refetches the manifest, the
   splat loads, and the placeholder sphere drops out (or the `fail` API on error). The web process still
-  never runs SHARP. Placement is fine-tuned afterwards in the explorer's **edit mode** (`E` → click →
-  `G/R/S` gizmo → save). Next.js 16 Route Handlers (`app/api/memories/**`) wire it together; the routes
+  never runs SHARP. Placement is fine-tuned afterwards in the explorer's **edit mode** (toolbar Edit
+  icon → click → drag the unified gumball gizmo; auto-saves; `Esc` exits). Next.js 16 Route Handlers
+  (`app/api/memories/**`) wire it together; the routes
   are the manual/seam-tested boundaries. The city is **Wolfsburg** (`config/explorer.CITY`, origin
   52.4227, 10.7865). **No authentication** — curated, locally-run installation, so the contribution
   routes are open by design.

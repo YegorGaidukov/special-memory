@@ -28,7 +28,7 @@ export const PREVIEW = { pointSize: 0.12, fadeMs: 2500 } as const;
 export const RESIDENCY_TICK_MS = 200;
 
 // Free-fly movement. baseSpeed is metres/second of WASD flight; holding Shift
-// multiplies it by boost for quick traversawwwl across the city.
+// multiplies it by boost for quick traversal across the city.
 export const FLY = { baseSpeed: 5, boost: 4 } as const;
 
 // Click-to-travel framing.

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getCameraPose } from "@/lib/camera/pose";
+import styles from "./DropToContribute.module.css";
 
 // DOM overlay over the explorer canvas: the only entry point for adding a memory.
 // Drop a photo anywhere on the window → upload via POST /api/memories → stay on
@@ -12,13 +13,6 @@ import { getCameraPose } from "@/lib/camera/pose";
 //
 // Pointer-lock note: during free-fly the cursor is OS-captured and browsers don't
 // fire file-drop events, so this is naturally inert while flying — no extra code.
-
-const panel: React.CSSProperties = {
-  position: "fixed",
-  pointerEvents: "none",
-  font: "12px system-ui, -apple-system, sans-serif",
-  zIndex: 10,
-};
 
 type Status = "idle" | "uploading" | "done" | "error";
 
@@ -35,6 +29,9 @@ export default function DropToContribute() {
   // dragenter/dragleave fire per child element; count them so the overlay only
   // clears when the cursor actually leaves the window.
   const depth = useRef(0);
+  // Hidden file input backing the "share a memory" button (the explicit upload
+  // path alongside drag-and-drop).
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const upload = useCallback(async (files: FileList) => {
     const picked = pickImage(files);
@@ -98,12 +95,38 @@ export default function DropToContribute() {
 
   return (
     <>
-      {/* Persistent hint / status — top-right corner. */}
-      <div style={{ ...panel, top: 14, right: 16, color: "var(--ink-mute)", textAlign: "right" }}>
-        {status === "idle" && "Drag a photo here to add a memory"}
-        {status === "uploading" && "Uploading…"}
-        {status === "done" && "Memory added — reconstructing…"}
-        {status === "error" && <span style={{ color: "#ff8080" }}>{error}</span>}
+      {/* The only persistent upload affordance: a centered button at the bottom.
+          Opens the OS file picker; drag-and-drop still works in parallel. */}
+      <div className={styles.dock}>
+        {status !== "idle" && (
+          <div
+            className={styles.status}
+            style={status === "error" ? { color: "#ff8080" } : undefined}
+          >
+            {status === "uploading" && "Uploading…"}
+            {status === "done" && "Memory added — reconstructing…"}
+            {status === "error" && error}
+          </div>
+        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const files = e.target.files;
+            if (files && files.length) void upload(files);
+            e.target.value = ""; // allow re-picking the same file
+          }}
+        />
+        <button
+          type="button"
+          className={styles.shareBtn}
+          onClick={() => fileRef.current?.click()}
+          disabled={status === "uploading"}
+        >
+          share a memory
+        </button>
       </div>
 
       {/* Drag overlay — dims the void and confirms the drop target. */}
@@ -121,7 +144,9 @@ export default function DropToContribute() {
         >
           <div
             style={{
-              font: "600 15px system-ui, -apple-system, sans-serif",
+              fontFamily: "var(--font-sans)",
+              fontWeight: 600,
+              fontSize: 15,
               color: "var(--ink)",
               padding: "18px 28px",
               borderRadius: 10,

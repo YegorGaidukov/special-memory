@@ -23,9 +23,16 @@ type OrbitLike = { enabled: boolean; target: THREE.Vector3; update?: () => void 
 export default function Travel({
   records,
   onArrive,
+  travelToId,
+  onTravelStarted,
 }: {
   records: MemoryRecord[];
   onArrive?: (record: MemoryRecord) => void;
+  // A memory id requested from outside the canvas (the Library list). When it
+  // turns non-null we start a fly-to and call onTravelStarted so the parent can
+  // reset it — re-picking the same id then fires again.
+  travelToId?: string | null;
+  onTravelStarted?: () => void;
 }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
@@ -42,6 +49,34 @@ export default function Travel({
   onArriveRef.current = onArrive;
   const controlsRef = useRef(controls);
   controlsRef.current = controls;
+
+  // Start a fly-to toward a record. Shared by the double-click handler and the
+  // Library; reads the live camera pose as the flight's starting point.
+  const flyToRecord = useRef((hit: MemoryRecord) => {
+    const origin: Vec3 = [camera.position.x, camera.position.y, camera.position.z];
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    const from = {
+      position: origin,
+      lookAt: [origin[0] + dir.x * 10, origin[1] + dir.y * 10, origin[2] + dir.z * 10] as Vec3,
+    };
+    const to = framePoseForRecord(hit, origin, FLY_TO_STANDOFF);
+    fly.current = makeFlyTo(from, to, FLY_TO_DURATION_MS);
+    flyElapsed.current = 0;
+    flyTarget.current = hit;
+    const c = controlsRef.current;
+    if (c) c.enabled = false; // suspend orbit + WASD for the duration of the flight
+  });
+
+  // Library-driven travel: fly to the requested id, then let the parent clear it.
+  const onTravelStartedRef = useRef(onTravelStarted);
+  onTravelStartedRef.current = onTravelStarted;
+  useEffect(() => {
+    if (!travelToId) return;
+    const hit = recordsRef.current.find((r) => r.id === travelToId);
+    if (hit) flyToRecord.current(hit);
+    onTravelStartedRef.current?.();
+  }, [travelToId]);
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -63,20 +98,7 @@ export default function Travel({
       const id = memoryAtPointer(recordsRef.current, ndc, camera);
       const hit = id ? recordsRef.current.find((r) => r.id === id) : null;
       if (!hit) return;
-
-      const origin: Vec3 = [camera.position.x, camera.position.y, camera.position.z];
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      const from = {
-        position: origin,
-        lookAt: [origin[0] + dir.x * 10, origin[1] + dir.y * 10, origin[2] + dir.z * 10] as Vec3,
-      };
-      const to = framePoseForRecord(hit, origin, FLY_TO_STANDOFF);
-      fly.current = makeFlyTo(from, to, FLY_TO_DURATION_MS);
-      flyElapsed.current = 0;
-      flyTarget.current = hit;
-      const c = controlsRef.current;
-      if (c) c.enabled = false; // suspend orbit + WASD for the duration of the flight
+      flyToRecord.current(hit);
     };
 
     // Any deliberate user input (grabbing orbit, or starting to fly manually)

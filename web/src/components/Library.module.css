@@ -1,0 +1,126 @@
+/* Memory list panel — opened from the toolbar's Library icon. Glass panel pinned
+   to the right edge, just left of the action rail, vertically centered. Mirrors
+   the inspector's glass styling (globals.css tokens). */
+.panel {
+  position: fixed;
+  top: 50%;
+  right: 78px;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 232px;
+  max-height: min(70vh, 520px);
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow-panel);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 11px;
+  animation: libIn var(--dur) var(--ease-out);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .panel {
+    background: var(--panel-solid);
+  }
+}
+
+@keyframes libIn {
+  from {
+    opacity: 0;
+    transform: translate(6px, -50%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.close {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-mute);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+.close:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--field-hover);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+  overflow-y: auto;
+  /* Bleed the scroll area to the panel edges so the scrollbar hugs the border. */
+  margin-right: -6px;
+  padding-right: 6px;
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+.row:hover {
+  background: var(--field-hover);
+}
+.row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.rowId {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.rowDate {
+  flex: none;
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.empty {
+  color: var(--ink-mute);
+  font-size: 12.5px;
+}

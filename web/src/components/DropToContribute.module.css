@@ -1,0 +1,64 @@
+/* The bottom-center upload dock: a "share a memory" button (the explicit entry
+   point now that the corner hint is gone) with a status line above it. */
+.dock {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.status {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-dim);
+  text-align: center;
+  animation: fadeUp 180ms var(--ease-out);
+}
+
+.shareBtn {
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow-panel);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 150ms var(--ease-out), border-color 150ms var(--ease-out),
+    transform 100ms var(--ease-out);
+}
+.shareBtn:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+.shareBtn:active {
+  transform: translateY(1px);
+}
+.shareBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.shareBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

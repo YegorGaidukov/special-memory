@@ -1,0 +1,58 @@
+/* Right-edge vertical action rail — a slim glass pill of icon toggles, pinned to
+   the vertical center. Token-styled so it inverts with the theme: dark glass in
+   dark mode, light in light mode. */
+.rail {
+  position: fixed;
+  top: 50%;
+  right: 18px;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow-panel);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  padding: 7px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color 150ms var(--ease-out), background-color 150ms var(--ease-out),
+    transform 100ms var(--ease-out);
+}
+.btn:hover {
+  background: var(--field-hover);
+  color: var(--ink);
+}
+.btn:active {
+  transform: scale(0.94);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Toggled-on state (map shown / library open). */
+.btn[data-active] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn[data-active]:hover {
+  background: var(--accent-strong);
+  color: var(--accent-ink);
+}

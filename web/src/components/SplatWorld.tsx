@@ -12,23 +12,22 @@ import CameraPoseProbe from "@/components/CameraPoseProbe";
 import PendingSpheres from "@/components/PendingSpheres";
 import MapGround from "@/components/MapGround";
 import ExplorerEditor from "@/components/ExplorerEditor";
-import EditHud, { type Shortcut } from "@/components/EditHud";
-import TravelOverlay from "@/components/TravelOverlay";
+import EditHud from "@/components/EditHud";
+import Toolbar from "@/components/Toolbar";
+import Library from "@/components/Library";
+import ThemeToggle from "@/components/ThemeToggle";
+import { useTheme } from "@/hooks/useTheme";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
 import { applyEdits } from "@/lib/transform/overlay";
 import { MAP } from "@/config/explorer";
 import { getResident } from "@/lib/splat/registry";
 import type { MemoryRecord } from "@/lib/manifest/types";
-import styles from "./SplatWorld.module.css";
-
-// Shown in the inspector's empty state (edit mode on, nothing selected yet).
-const EDIT_SHORTCUTS: Shortcut[] = [
-  { keys: ["Click"], label: "Select a memory" },
-  { keys: ["Drag"], label: "Gizmo handles: move · rotate · scale" },
-];
 
 // Stable empty list so the nav/travel effects don't re-bind before the manifest loads.
 const EMPTY: MemoryRecord[] = [];
+
+// Canvas clear color per theme (kept in sync with --void in globals.css).
+const VOID_COLOR = { dark: "#05060a", light: "#eef1f6" } as const;
 
 function ContextLossLogger() {
   const gl = useThree((s) => s.gl);
@@ -45,8 +44,14 @@ export default function SplatWorld() {
   const [mapVisible, setMapVisible] = useState<boolean>(MAP.enabled);
   const m = useManifest(manifestVersion);
   const storeRecords = usePendingMemories();
-  const [current, setCurrent] = useState<MemoryRecord | null>(null);
   const baseRecords = m.status === "ready" ? m.manifest.memories : EMPTY;
+  const { theme } = useTheme();
+
+  // Library panel (memory list) + the travel command it issues. travelToId is set
+  // when a row is clicked; Travel consumes it and we reset it to null so picking
+  // the same memory again re-fires.
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [travelToId, setTravelToId] = useState<string | null>(null);
 
   // Edit mode: a curator toggle (off by default — the public fly-through is
   // untouched). Navigation (orbit + WASD) is shared by both modes; edit mode adds
@@ -155,6 +160,17 @@ export default function SplatWorld() {
     setSaveError(null);
   }, []);
 
+  // Esc leaves edit mode (the inspector's only shown once a memory is selected,
+  // so the keyboard is the reliable exit). Bound only while editing.
+  useEffect(() => {
+    if (!editMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") exitEdit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editMode, exitEdit]);
+
   // A numeric-field edit in the inspector: write it onto the live resident mesh
   // (the gizmo follows the object each frame), mirror it into the readout, and
   // schedule the auto-save.
@@ -168,24 +184,6 @@ export default function SplatWorld() {
     },
     [selectedId, scheduleSave],
   );
-
-  // E toggles edit mode; M toggles the map. The gumball gizmo does move/rotate/
-  // scale all at once, so there's no per-mode key. Ignored while typing in a
-  // field so the inspector's numeric inputs don't trigger shortcuts.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable))
-        return;
-      if (e.key === "e" || e.key === "E") {
-        setEditMode((on) => !on);
-      } else if (e.key === "m" || e.key === "M") {
-        setMapVisible((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   // Leaving edit mode clears the current selection.
   useEffect(() => {
@@ -210,7 +208,7 @@ export default function SplatWorld() {
         gl={{ antialias: true }}
         camera={{ position: [0, 12, 70], fov: 60, near: 0.1, far: 20000 }}
       >
-        <color attach="background" args={["#05060a"]} />
+        <color attach="background" args={[VOID_COLOR[theme]]} />
         <ContextLossLogger />
         <CameraPoseProbe />
         <MapGround visible={mapVisible} />
@@ -231,7 +229,11 @@ export default function SplatWorld() {
             onCommit={scheduleSave}
           />
         ) : (
-          <Travel records={records} onArrive={setCurrent} />
+          <Travel
+            records={records}
+            travelToId={travelToId}
+            onTravelStarted={() => setTravelToId(null)}
+          />
         )}
       </Canvas>
       {editMode ? (
@@ -243,37 +245,31 @@ export default function SplatWorld() {
             saveError={saveError}
             savedAt={savedAt}
             selectedLabel={selectedId}
-            hint={selectedId ? "Loading memory…" : "Click a memory to select it."}
-            shortcuts={EDIT_SHORTCUTS}
             onExit={exitEdit}
           />
         </div>
       ) : (
         <>
-          <button className={styles.editToggle} onClick={() => setEditMode(true)}>
-            Edit placements
-            <span className={styles.editKbd}>E</span>
-          </button>
-          <button
-            className={styles.editToggle}
-            style={{ top: 56 }}
-            onClick={() => setMapVisible((v) => !v)}
-          >
-            {mapVisible ? "Hide map" : "Show map"}
-            <span className={styles.editKbd}>M</span>
-          </button>
+          <Toolbar
+            mapVisible={mapVisible}
+            libraryOpen={libraryOpen}
+            onEdit={() => setEditMode(true)}
+            onToggleMap={() => setMapVisible((v) => !v)}
+            onToggleLibrary={() => setLibraryOpen((o) => !o)}
+          />
+          {libraryOpen && (
+            <Library
+              records={records}
+              onTravel={(id) => {
+                setTravelToId(id);
+                setLibraryOpen(false);
+              }}
+              onClose={() => setLibraryOpen(false)}
+            />
+          )}
         </>
       )}
-      {/* The fly-through chrome (title + WASD hint) doesn't apply in edit mode,
-          and its title would collide with the inspector header. */}
-      {!editMode && (
-        <TravelOverlay
-          status={m.status}
-          count={records.length}
-          error={m.status === "error" ? m.error : undefined}
-          current={current}
-        />
-      )}
+      <ThemeToggle />
     </>
   );
 }
