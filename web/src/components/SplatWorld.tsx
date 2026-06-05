@@ -14,7 +14,6 @@ import MapGround from "@/components/MapGround";
 import ExplorerEditor from "@/components/ExplorerEditor";
 import EditHud, { type Shortcut } from "@/components/EditHud";
 import TravelOverlay from "@/components/TravelOverlay";
-import type { GizmoMode } from "@/components/Gizmo";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
 import { applyEdits } from "@/lib/transform/overlay";
 import { MAP } from "@/config/explorer";
@@ -25,7 +24,7 @@ import styles from "./SplatWorld.module.css";
 // Shown in the inspector's empty state (edit mode on, nothing selected yet).
 const EDIT_SHORTCUTS: Shortcut[] = [
   { keys: ["Click"], label: "Select a memory" },
-  { keys: ["G", "R", "S"], label: "Move · rotate · scale" },
+  { keys: ["Drag"], label: "Gizmo handles: move · rotate · scale" },
 ];
 
 // Stable empty list so the nav/travel effects don't re-bind before the manifest loads.
@@ -55,7 +54,6 @@ export default function SplatWorld() {
   // record.
   const [editMode, setEditMode] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<GizmoMode>("translate");
   const [liveTransform, setLiveTransform] = useState<StoredTransform | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -104,11 +102,51 @@ export default function SplatWorld() {
   // `liveTransform` change avoids that cross-assignment.
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
+  // Latest transform on screen, read at save-fire time (the debounce closure must
+  // not capture a stale value).
+  const liveRef = useRef(liveTransform);
+  liveRef.current = liveTransform;
   useEffect(() => {
     const id = selectedIdRef.current;
     if (!id || !liveTransform) return;
     setEdits((e) => ({ ...e, [id]: liveTransform }));
   }, [liveTransform]);
+
+  // Auto-save: edits persist on their own (no Save button). Debounced so a gizmo
+  // drag or a burst of keystrokes coalesces into one PATCH once it settles. Only
+  // user edits call scheduleSave — selecting a memory (which sets liveTransform to
+  // its stored value) never does, so picking a memory doesn't trigger a write.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistTransform = useCallback(async (id: string, t: StoredTransform) => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const r = await fetch(`/api/memories/${id}/transform`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transform: t }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setSavedAt(Date.now());
+    } catch (e) {
+      setSaveError(String((e as Error).message ?? e));
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+  const scheduleSave = useCallback(() => {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const t = liveRef.current;
+      if (t) void persistTransform(id, t);
+    }, 400);
+  }, [persistTransform]);
+  // Flush any pending timer on unmount.
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
 
   const exitEdit = useCallback(() => {
     setEditMode(false);
@@ -118,19 +156,22 @@ export default function SplatWorld() {
   }, []);
 
   // A numeric-field edit in the inspector: write it onto the live resident mesh
-  // (the gizmo follows the object each frame) and mirror it into the readout.
+  // (the gizmo follows the object each frame), mirror it into the readout, and
+  // schedule the auto-save.
   const applyEdit = useCallback(
     (next: StoredTransform) => {
       if (!selectedId) return;
       const mesh = getResident(selectedId);
       if (mesh) applyStoredTransform(mesh, next);
       setLiveTransform(next);
+      scheduleSave();
     },
-    [selectedId],
+    [selectedId, scheduleSave],
   );
 
-  // E toggles edit mode; G/R/S switch gizmo mode. Ignored while typing in a field
-  // so the inspector's numeric inputs don't trigger shortcuts.
+  // E toggles edit mode; M toggles the map. The gumball gizmo does move/rotate/
+  // scale all at once, so there's no per-mode key. Ignored while typing in a
+  // field so the inspector's numeric inputs don't trigger shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
@@ -140,15 +181,11 @@ export default function SplatWorld() {
         setEditMode((on) => !on);
       } else if (e.key === "m" || e.key === "M") {
         setMapVisible((v) => !v);
-      } else if (editMode) {
-        if (e.key === "g" || e.key === "G") setMode("translate");
-        else if (e.key === "r" || e.key === "R") setMode("rotate");
-        else if (e.key === "s" || e.key === "S") setMode("scale");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editMode]);
+  }, []);
 
   // Leaving edit mode clears the current selection.
   useEffect(() => {
@@ -157,25 +194,6 @@ export default function SplatWorld() {
       setLiveTransform(null);
     }
   }, [editMode]);
-
-  async function saveTransform() {
-    if (!selectedId || !liveTransform) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      const r = await fetch(`/api/memories/${selectedId}/transform`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ transform: liveTransform }),
-      });
-      if (!r.ok) throw new Error(await r.text());
-      setSavedAt(Date.now());
-    } catch (e) {
-      setSaveError(String((e as Error).message ?? e));
-    } finally {
-      setSaving(false);
-    }
-  }
 
   return (
     <>
@@ -209,8 +227,8 @@ export default function SplatWorld() {
             records={records}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            mode={mode}
             onTransformChange={setLiveTransform}
+            onCommit={scheduleSave}
           />
         ) : (
           <Travel records={records} onArrive={setCurrent} />
@@ -219,18 +237,14 @@ export default function SplatWorld() {
       {editMode ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 50, pointerEvents: "none" }}>
           <EditHud
-            mode={mode}
-            onModeChange={setMode}
             transform={liveTransform}
             onEditTransform={applyEdit}
-            onSave={saveTransform}
             saving={saving}
             saveError={saveError}
             savedAt={savedAt}
             selectedLabel={selectedId}
             hint={selectedId ? "Loading memory…" : "Click a memory to select it."}
             shortcuts={EDIT_SHORTCUTS}
-            onDeselect={() => setSelectedId(null)}
             onExit={exitEdit}
           />
         </div>

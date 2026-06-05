@@ -7,7 +7,7 @@ import type { MemoryRecord } from "@/lib/manifest/types";
 import { getResident } from "@/lib/splat/registry";
 import { readMeshTransform, type StoredTransform } from "@/lib/transform/apply";
 import { worldCorners, memoryAtPointer } from "@/lib/camera/pickAtPointer";
-import Gizmo, { type GizmoMode } from "@/components/Gizmo";
+import Gizmo from "@/components/Gizmo";
 import EditBoxes from "@/components/EditBoxes";
 
 // Click radius (px) around a projected bbox corner that counts as selecting it.
@@ -22,14 +22,15 @@ export default function ExplorerEditor({
   records,
   selectedId,
   onSelect,
-  mode,
   onTransformChange,
+  onCommit,
 }: {
   records: MemoryRecord[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  mode: GizmoMode;
   onTransformChange: (t: StoredTransform | null) => void;
+  // Called when a gizmo drag ends — the parent persists the settled transform.
+  onCommit?: () => void;
 }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
@@ -130,8 +131,10 @@ export default function ExplorerEditor({
       {mesh && (
         <Gizmo
           object={mesh}
-          mode={mode}
           onObjectChange={() => onTransformChange(readMeshTransform(mesh))}
+          onDraggingChanged={(dragging) => {
+            if (!dragging) onCommit?.();
+          }}
         />
       )}
     </>

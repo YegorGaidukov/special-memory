@@ -48,7 +48,7 @@ export const CITY = {
 // Styling is config-only (no in-app restyle UI); the explorer toggles visibility.
 // `spanMeters` is the ground extent; `opacity`/`tint` make it "barely visible".
 export const MAP = {
-  enabled: true,
+  enabled: false,
   style: OSM_STYLE,
   spanMeters: 4000,
   textureSize: 4096,

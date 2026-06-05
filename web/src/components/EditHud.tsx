@@ -1,16 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { StoredTransform } from "@/lib/transform/apply";
-import type { GizmoMode } from "@/components/Gizmo";
 import { headingToQuaternion, quaternionToHeadingDeg } from "@/lib/geo/heading";
 import styles from "./EditHud.module.css";
-
-const MODES: { id: GizmoMode; label: string; key: string; icon: ReactElement }[] = [
-  { id: "translate", label: "Move", key: "G", icon: <MoveIcon /> },
-  { id: "rotate", label: "Rotate", key: "R", icon: <RotateIcon /> },
-  { id: "scale", label: "Scale", key: "S", icon: <ScaleIcon /> },
-];
 
 /** A shortcut hint shown in the empty state (when nothing is selected). */
 export interface Shortcut {
@@ -20,42 +13,32 @@ export interface Shortcut {
 
 /**
  * Glass inspector (DOM overlay outside the canvas) for the transform editor:
- * mode switch, editable position/heading/scale fields, and Save. Shared by the
- * explorer edit mode and the placement-page editor. Presentational — the parent
- * owns the selected object, applies edits to the live mesh (`onEditTransform`),
- * and persists (`onSave`).
+ * editable position/heading/scale fields, and Save. The in-canvas gumball gizmo
+ * handles move/rotate/scale directly, so there's no mode switch here.
+ * Presentational — the parent owns the selected object, applies edits to the
+ * live mesh (`onEditTransform`), and persists (`onSave`).
  */
 export default function EditHud({
-  mode,
-  onModeChange,
   transform,
   onEditTransform,
-  onSave,
   saving,
   saveError,
   savedAt,
   selectedLabel,
   hint,
   shortcuts,
-  onDeselect,
   onExit,
 }: {
-  mode: GizmoMode;
-  onModeChange: (m: GizmoMode) => void;
   transform: StoredTransform | null;
   onEditTransform?: (next: StoredTransform) => void;
-  onSave: () => void;
   saving: boolean;
   saveError?: string | null;
   savedAt?: number | null;
   selectedLabel?: string | null;
   hint?: string | null;
   shortcuts?: Shortcut[];
-  onDeselect?: () => void;
   onExit?: () => void;
 }) {
-  const activeIndex = MODES.findIndex((m) => m.id === mode);
-
   // Editing helpers: build the next stored transform from a single edited value.
   const setPosition = (axis: 0 | 1 | 2, v: number) => {
     if (!transform || !onEditTransform) return;
@@ -85,28 +68,6 @@ export default function EditHud({
             <span aria-hidden>✕</span>
           </button>
         )}
-      </div>
-
-      <div
-        className={styles.seg}
-        data-disabled={!transform}
-        style={{ "--seg-index": activeIndex } as CSSProperties}
-      >
-        <span className={styles.segIndicator} aria-hidden />
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            className={styles.segBtn}
-            data-active={mode === m.id}
-            onClick={() => onModeChange(m.id)}
-            disabled={!transform}
-            title={`${m.label} (${m.key})`}
-          >
-            {m.icon}
-            <span>{m.label}</span>
-            <span className={styles.segKey}>{m.key}</span>
-          </button>
-        ))}
       </div>
 
       {transform ? (
@@ -162,18 +123,12 @@ export default function EditHud({
             </div>
           </div>
 
-          <div className={styles.actions}>
-            <button className={styles.btnPrimary} onClick={onSave} disabled={saving}>
-              {saving ? "Saving…" : "Save placement"}
-            </button>
-            {onDeselect && (
-              <button className={styles.btnGhost} onClick={onDeselect}>
-                Deselect
-              </button>
-            )}
-          </div>
-
-          <StatusLine savedAt={savedAt} saveError={saveError} selectedLabel={selectedLabel} />
+          <StatusLine
+            saving={saving}
+            savedAt={savedAt}
+            saveError={saveError}
+            selectedLabel={selectedLabel}
+          />
         </>
       ) : (
         <div className={styles.empty}>
@@ -200,12 +155,17 @@ export default function EditHud({
   );
 }
 
-/** Status row: a transient "Saved" confirmation, an error, or the memory id. */
+/**
+ * Status row: a live "Saving…" / "Saved" auto-save indicator, an error, or the
+ * memory id. Edits persist automatically (no Save button).
+ */
 function StatusLine({
+  saving,
   savedAt,
   saveError,
   selectedLabel,
 }: {
+  saving?: boolean;
   savedAt?: number | null;
   saveError?: string | null;
   selectedLabel?: string | null;
@@ -224,6 +184,8 @@ function StatusLine({
     <div className={styles.status}>
       {saveError ? (
         <span className={styles.error}>{saveError}</span>
+      ) : saving ? (
+        <span className={styles.metaLabel}>Saving…</span>
       ) : showSaved ? (
         <span className={styles.saved}>
           <CheckIcon /> Saved
@@ -295,30 +257,6 @@ function iconProps() {
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
   };
-}
-function MoveIcon() {
-  return (
-    <svg {...iconProps()}>
-      <path d="M12 3v18M3 12h18" />
-      <path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />
-    </svg>
-  );
-}
-function RotateIcon() {
-  return (
-    <svg {...iconProps()}>
-      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-      <path d="M21 3v6h-6" />
-    </svg>
-  );
-}
-function ScaleIcon() {
-  return (
-    <svg {...iconProps()}>
-      <path d="M14 4h6v6M10 20H4v-6" />
-      <path d="M20 4l-8 8M4 20l5-5" />
-    </svg>
-  );
 }
 function CheckIcon() {
   return (
