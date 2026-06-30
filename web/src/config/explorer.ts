@@ -34,6 +34,19 @@ export const PREVIEW = { pointSize: 0.12, fadeMs: 2500 } as const;
 // is cheap (distance compares), so this just avoids running it every frame.
 export const RESIDENCY_TICK_MS = 200;
 
+// Spatial audio (S4): a memory's voice note plays as positional audio that gets
+// louder as the camera nears it. loadRadius/disposeRadius drive residency (reusing
+// decideLod) — audio carries a bit farther than the splat. The panner uses the
+// linear distance model: full volume within refDistance, ~silent by maxDistance.
+export const AUDIO = {
+  loadRadius: 60,
+  disposeRadius: 90,
+  maxConcurrent: 4,
+  refDistance: 6,
+  maxDistance: 60,
+  rolloffFactor: 1,
+} as const;
+
 // Free-fly movement. baseSpeed is metres/second of WASD flight; holding Shift
 // multiplies it by boost for quick traversal across the city.
 export const FLY = { baseSpeed: 5, boost: 4 } as const;

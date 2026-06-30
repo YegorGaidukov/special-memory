@@ -15,6 +15,7 @@ import ExplorerEditor from "@/components/ExplorerEditor";
 import EditHud from "@/components/EditHud";
 import Toolbar from "@/components/Toolbar";
 import Library from "@/components/Library";
+import MemoryAudio from "@/components/MemoryAudio";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useTheme } from "@/hooks/useTheme";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
@@ -53,6 +54,8 @@ export default function SplatWorld() {
   // the same memory again re-fires.
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [travelToId, setTravelToId] = useState<string | null>(null);
+  // Browsers block audio until a user gesture; the "enable sound" button flips this.
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   // Edit mode: a curator toggle (off by default — the public fly-through is
   // untouched). Navigation (orbit + WASD) is shared by both modes; edit mode adds
@@ -219,6 +222,7 @@ export default function SplatWorld() {
             forceResidentId={editMode ? selectedId : null}
           />
         )}
+        {m.status === "ready" && <MemoryAudio records={records} enabled={soundEnabled} />}
         <PendingSpheres records={pending} />
         <Navigation />
         {editMode ? (
@@ -269,6 +273,30 @@ export default function SplatWorld() {
             />
           )}
         </>
+      )}
+      {!soundEnabled && (
+        <button
+          type="button"
+          onClick={() => setSoundEnabled(true)}
+          title="Enable spatial audio"
+          style={{
+            position: "fixed",
+            left: 16,
+            bottom: 16,
+            zIndex: 50,
+            padding: "10px 14px",
+            borderRadius: 11,
+            border: "1px solid var(--line)",
+            background: "var(--panel-solid)",
+            color: "var(--ink)",
+            font: "inherit",
+            fontSize: "0.9rem",
+            cursor: "pointer",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          🔊 Enable sound
+        </button>
       )}
       <ThemeToggle />
     </>
