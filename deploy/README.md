@@ -34,6 +34,43 @@ admin was needed; non-elevated Caddy binds 80/443 on this box. For crash-restart
 auto-login independence, an admin could instead register the two launchers as Scheduled Tasks
 `onstart`.)
 
+**Safe restart:** run `deploy\restart-stack.cmd`. ⚠️ Do **not** just re-run `autostart.cmd` — the old
+self-restart loops keep holding ports 8000/80/443, so the new ones fail to bind. `restart-stack.cmd`
+stops the old loops + workers first, then starts fresh.
+
+## Updating the server to a new commit
+
+The launchers only **run** the stack — they don't pull or rebuild. And `web\out` is **git-ignored**, so
+a frontend change is only live after a rebuild on the server. The easy thing to forget. One command
+does it all:
+
+```powershell
+deploy\update-server.cmd
+```
+
+It: activates the `sharp` env → `git pull --ff-only` → `pip install` / `npm ci` **only if** the
+req/lock files changed in the pull → **always** rebuilds the static frontend (`STATIC_EXPORT=1 npm run
+build` → `web\out`) → `restart-stack.cmd`. Run it in a normal terminal (not over SSH-into-bash; it
+spawns windows).
+
+Doing it by hand instead:
+
+```powershell
+cd /d D:\Yegor\Github\special-memory
+call C:\ProgramData\miniconda3\Scripts\activate.bat sharp
+git pull --ff-only
+pip install -r requirements-backend.txt -r requirements-pipeline.txt   REM only if these changed
+cd web && npm ci && cd ..                                              REM only if package-lock.json changed
+cd web && set STATIC_EXPORT=1 && npm run build && cd ..                REM always (regenerates web\out)
+deploy\restart-stack.cmd
+```
+
+What needs a restart after a change:
+- **Backend** (`backend\**`, `pipeline\**`): yes — there's no `--reload`. `restart-stack.cmd`.
+- **Frontend** (`web\**`): no process restart — Caddy serves `web\out` from disk, so the rebuild above
+  is already live. Just hard-refresh the projector/kiosk browser (Ctrl+F5).
+- **`deploy\Caddyfile`**: restart Caddy — `restart-stack.cmd` (or `caddy reload --config deploy\Caddyfile`).
+
 ## Recommended: run the backend natively in the `sharp` conda env
 
 SHARP needs native CUDA; the existing dev/exhibition setup already has the `sharp` conda env with a
