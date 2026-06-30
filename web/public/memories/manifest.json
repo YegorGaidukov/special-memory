@@ -213,6 +213,77 @@
         "scale": 1
       },
       "created_at": "2026-06-05T09:00:21.959Z"
+    },
+    {
+      "id": "mem-09-ee62c63c",
+      "status": "approved",
+      "thumbnail_url": "mem-09-ee62c63c.jpg",
+      "splat_url": "mem-09-ee62c63c.sog",
+      "transform": {
+        "position": [
+          60.65877902764504,
+          36.37472022032245,
+          57.71492073165248
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "created_at": "2026-06-05T11:26:30.871Z"
+    },
+    {
+      "id": "mem-06-c9b31b4d",
+      "status": "approved",
+      "thumbnail_url": "mem-06-c9b31b4d.jpg",
+      "splat_url": "mem-06-c9b31b4d.sog",
+      "transform": {
+        "position": [
+          597.2061245085077,
+          395.360302156621,
+          318.56604957724255
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "created_at": "2026-06-05T11:33:51.007Z"
+    },
+    {
+      "id": "700e131360e927241b1d475dcc6e89b8-3917e8af",
+      "status": "approved",
+      "thumbnail_url": "700e131360e927241b1d475dcc6e89b8-3917e8af.jpg",
+      "splat_url": "700e131360e927241b1d475dcc6e89b8-3917e8af.sog",
+      "transform": {
+        "position": [
+          43.713461159511795,
+          -5.526124360557784,
+          -102.43803680397403
+        ],
+        "quaternion": [
+          -0.017407070123923216,
+          -0.2997968758665309,
+          -0.055289822918789665,
+          0.952240443696852
+        ],
+        "scale": 1
+      },
+      "created_at": "2026-06-05T12:47:51.981Z"
     }
   ]
 }
