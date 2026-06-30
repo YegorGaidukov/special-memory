@@ -174,6 +174,28 @@ npm run start        # serve the production build — VERIFY HERE, not dev
 npm test             # Vitest unit tests (pure logic; WebGL renderer is the mocked seam)
 ```
 
+**S4 backend + deployment re-architecture (in progress).** The exhibition target is **Architecture
+A**: everything same-origin on the ki-pc GPU box behind **Caddy/HTTPS** — a **FastAPI backend**
+(`backend/`) that **absorbs `pipeline/` and runs SHARP inline**, plus the **static-exported**
+frontend. This replaces the Next.js Route Handlers (deleted) and the `pipeline.watch` watcher
+(retired; inline reconstruction now). GitHub Pages is dropped (mic needs HTTPS, the splat renderer
+needs COOP/COEP headers Pages can't send, assets are GPU-local). The frontend talks to the backend
+via `getApiBaseUrl()` (`web/src/lib/api/baseUrl.ts`) — same-origin in prod, dev proxies `/api` +
+`/assets` to `:8000` via `next.config.ts` rewrites. Spec:
+`docs/superpowers/specs/2026-06-30-s4-phone-companion-and-ki-pc-deployment-design.md`. Deploy guide:
+`deploy/README.md`. Backend pure logic is **pytest-tested** (ports of the former TS `server/**` +
+`lib/{geo,upload,exif,manifest}`); SHARP/EXIF/fs/WebSocket are the seams.
+
+```powershell
+# Backend (in the `sharp` conda env for real GPU reconstruction)
+pip install -r requirements-backend.txt          # fastapi/uvicorn/pillow (one time)
+uvicorn backend.app:app --reload --port 8000     # dev; frontend `npm run dev` proxies to it
+# Static frontend export for deployment (served by Caddy on ki-pc):
+cd web && STATIC_EXPORT=1 npm run build           # -> web/out/   (NEXT_BASE_PATH=/sub for a subpath)
+# Tests (.venv): now covers both the pipeline and the FastAPI backend
+.\.venv\Scripts\python.exe -m pytest              # tests/ + backend/tests/
+```
+
 ## Conventions
 
 - **TDD, with the un-testable seam isolated.** S1: test the logic we write (command construction,
@@ -182,8 +204,9 @@ npm test             # Vitest unit tests (pure logic; WebGL renderer is the mock
   Vitest-tested; the WebGL Viewer is the single mocked seam, proven by the manual browser smoke
   test. Don't unit-test the GPU/WebGL.
 - **S2 gotchas:** React StrictMode is **disabled** (`web/next.config.ts`) — its dev double-mount
-  tore down the splat renderer's WebGL context. Spark's worker sort needs **COOP/COEP** headers
-  (set in `next.config.ts`) for SharedArrayBuffer. Spark ships its own types and inlines its
+  tore down the splat renderer's WebGL context. Spark's worker sort needs **COOP/COEP** headers for
+  SharedArrayBuffer: `next.config.ts` sets them for the **dev server only** (they're ignored by
+  `output: export`); in production **Caddy** sets them (`deploy/Caddyfile`). Spark ships its own types and inlines its
   workers (no `.wasm` to host). Verify on a **production build** (`npm run build && npm run start`),
   not dev — HMR remounts the WebGL canvas and throws spurious errors.
 - Small, single-responsibility modules in `pipeline/` (`thumbnails`, `sharp_runner`, `manifest`,

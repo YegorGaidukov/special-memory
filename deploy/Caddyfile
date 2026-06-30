@@ -1,0 +1,25 @@
+# Collective Memory City — dedicated-domain Caddy config for ki-pc.
+# Serves the static frontend export and reverse-proxies the FastAPI backend, all
+# same-origin with auto-TLS. For the shared chair domain, fold these directives into
+# the existing site block instead (see docs/server-connection.md, Option A).
+
+ki-pc.architektur.uni-weimar.de {
+	# Cross-origin isolation: the splat renderer sorts in a Web Worker using
+	# SharedArrayBuffer, which needs these. Same-origin assets satisfy COEP without CORP.
+	header {
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "require-corp"
+	}
+
+	# Backend: API, asset/audio/manifest serving, and the joystick WebSocket.
+	# Caddy auto-detects and upgrades the WebSocket on /ws/*.
+	reverse_proxy /api/* 127.0.0.1:8000
+	reverse_proxy /assets/* 127.0.0.1:8000
+	reverse_proxy /ws/* 127.0.0.1:8000
+
+	# Static frontend (Next.js export). Point root at the absolute path on ki-pc.
+	root * C:/srv/memory-city/out
+	file_server
+	# SPA-ish fallback for client routes (e.g. /m) and Next's .html outputs.
+	try_files {path} {path}.html {path}/index.html /index.html
+}

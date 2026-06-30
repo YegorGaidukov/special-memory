@@ -1,0 +1,27 @@
+# Add this service to the chair's config/docker-compose.yml (see docs/server-connection.md).
+# Use `expose` (not `ports`) — Caddy fronts it. The GPU reservation needs the NVIDIA
+# Container Toolkit + WSL2 GPU support on the Windows host.
+services:
+  memory-city-backend:
+    build:
+      context: ..                 # repo root
+      dockerfile: deploy/Dockerfile
+    container_name: memory-city-backend
+    expose:
+      - "8000"
+    volumes:
+      # Persist store + assets on the host so they survive rebuilds and Caddy can also
+      # serve the static frontend from the same checkout.
+      - ../web/data:/app/web/data
+      - ../web/public/memories:/app/web/public/memories
+    environment:
+      - PUBLIC_MEMORIES_DIR=/app/web/public/memories
+      - MEMORIES_STORE_PATH=/app/web/data/memories.json
+      - UPLOADS_DIR=/app/web/data/uploads
+      - RECON_INBOX=/app/web/data/inbox
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]

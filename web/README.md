@@ -1,5 +1,17 @@
 # Collective Memory City — Explorer (S2)
 
+> **⚠️ Architecture update (S4, in progress).** The app no longer self-hosts its API.
+> The frontend is now a **static export** (`STATIC_EXPORT=1 npm run build` → `web/out/`) served
+> same-origin behind **Caddy** on the **ki-pc** GPU box, alongside a **FastAPI backend** (`backend/`)
+> that absorbs `pipeline/` and runs **SHARP inline** (the Next.js Route Handlers and the
+> `pipeline.watch` watcher are gone). The frontend reaches the backend via `getApiBaseUrl()`
+> (`src/lib/api/baseUrl.ts`): same-origin in prod; in dev `next.config.ts` rewrites proxy `/api` +
+> `/assets` to the backend on `:8000`. Run both with `uvicorn backend.app:app --port 8000` +
+> `npm run dev`. See **`deploy/README.md`** and the spec
+> `docs/superpowers/specs/2026-06-30-s4-phone-companion-and-ki-pc-deployment-design.md`. Sections
+> below describing `npm run start`, `app/api/asset/[name]`, and the watcher are pre-S4 and kept for
+> the explorer-internals detail; the *serving* model they describe is superseded by the above.
+
 The web explorer: a dark-void world you fly through, where each uploaded photo
 appears as a photoreal 3D Gaussian-splat "memory" at its place in the city.
 Next.js (App Router) + React Three Fiber + [Spark](https://sparkjs.dev)
