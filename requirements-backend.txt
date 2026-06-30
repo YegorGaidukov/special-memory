@@ -1,0 +1,7 @@
+# FastAPI backend (runs on ki-pc alongside the `sharp` env / pipeline).
+# Pure-logic unit tests need none of these; the app + integration tests do.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pillow>=10.0
+httpx>=0.27   # required by fastapi.testclient
