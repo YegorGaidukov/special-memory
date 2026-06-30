@@ -174,11 +174,17 @@ npm run start        # serve the production build — VERIFY HERE, not dev
 npm test             # Vitest unit tests (pure logic; WebGL renderer is the mocked seam)
 ```
 
-**S4 backend + deployment re-architecture (in progress).** The exhibition target is **Architecture
-A**: everything same-origin on the ki-pc GPU box behind **Caddy/HTTPS** — a **FastAPI backend**
-(`backend/`) that **absorbs `pipeline/` and runs SHARP inline**, plus the **static-exported**
-frontend. This replaces the Next.js Route Handlers (deleted) and the `pipeline.watch` watcher
-(retired; inline reconstruction now). GitHub Pages is dropped (mic needs HTTPS, the splat renderer
+**S4 — Phone Companion + deployment re-architecture (BUILT, unit-tested; GPU/on-phone end-to-end
+still to verify on hardware).** The exhibition target is **Architecture A**: everything same-origin
+on the ki-pc GPU box behind **Caddy/HTTPS** — a **FastAPI backend** (`backend/`) that **absorbs
+`pipeline/` and runs SHARP inline**, plus the **static-exported** frontend. This replaces the Next.js
+Route Handlers (deleted) and the `pipeline.watch` watcher (retired; inline reconstruction now).
+S4 adds a minimal **`/m` phone page** (`web/src/app/m/`): **Add** (photo + manual-date fallback +
+MediaRecorder voice note; `placement=scatter` drops it near the cluster) and **Drive** (touch
+joystick — left half moves, right half looks, plus "jump to a memory"). Memories with a voice note
+play **spatial audio** on the projector (`MemoryAudio`, distance-attenuated, one-time "enable sound"
+gesture). The joystick is a **WebSocket** (`/ws/control`, single-driver token in `backend/control.py`;
+projector bridge `lib/control/remoteInput` read by `Navigation`). GitHub Pages is dropped (mic needs HTTPS, the splat renderer
 needs COOP/COEP headers Pages can't send, assets are GPU-local). The frontend talks to the backend
 via `getApiBaseUrl()` (`web/src/lib/api/baseUrl.ts`) — same-origin in prod, dev proxies `/api` +
 `/assets` to `:8000` via `next.config.ts` rewrites. Spec:
