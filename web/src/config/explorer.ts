@@ -51,6 +51,10 @@ export const AUDIO = {
 // multiplies it by boost for quick traversal across the city.
 export const FLY = { baseSpeed: 5, boost: 4 } as const;
 
+// Phone joystick (S4): how fast a full look-stick deflection turns the projected
+// view (radians/second of yaw / pitch). Movement reuses FLY.baseSpeed.
+export const CONTROL = { lookYaw: 2.2, lookPitch: 1.6 } as const;
+
 // Click-to-travel framing.
 export const FLY_TO_DURATION_MS = 1400;
 export const FLY_TO_STANDOFF = 10; // metres from a memory when arriving

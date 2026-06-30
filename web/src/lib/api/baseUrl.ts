@@ -18,3 +18,23 @@ export function getApiBaseUrl(): string {
 export function getAssetsBaseUrl(): string {
   return `${getApiBaseUrl()}/assets`;
 }
+
+const DEV_PORTS = new Set(["3000", "3001", "3002"]);
+
+/**
+ * Full ws(s):// URL for a backend WebSocket path (e.g. "/ws/control"). Unlike HTTP
+ * (proxied same-origin via Next rewrites in dev), the socket connects straight to the
+ * backend: ws://localhost:8000 in dev, wss://<same-origin> in prod behind Caddy.
+ * NEXT_PUBLIC_API_BASE_URL overrides the base.
+ */
+export function getWebSocketUrl(path: string): string {
+  let base = ENV_BASE ? stripTrailingSlash(ENV_BASE) : "";
+  if (!base && typeof window !== "undefined") {
+    const { hostname, port, protocol, host } = window.location;
+    base =
+      (hostname === "localhost" || hostname === "127.0.0.1") && DEV_PORTS.has(port)
+        ? "http://localhost:8000"
+        : `${protocol}//${host}`;
+  }
+  return `${base.replace(/^http/, "ws")}${path}`;
+}

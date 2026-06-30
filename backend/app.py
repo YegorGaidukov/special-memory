@@ -7,15 +7,26 @@ real-time joystick (WebSocket) is added in Phase 5.
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, Form, Request, Response, UploadFile
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    Form,
+    Request,
+    Response,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from . import config, services
+from .control import Controller, parse_control_state
 from .assets import asset_content_type, safe_asset_name
 from .exifdata import parse_placement, validate_captured_at
 from .ids import ext_of, make_record_id
@@ -230,3 +241,78 @@ def get_asset(name: str):
         media_type=asset_content_type(safe),
         headers={"cache-control": "public, max-age=0, must-revalidate"},
     )
+
+
+# --- real-time joystick (single driver) -----------------------------------------
+
+_controller = Controller(idle_timeout=8.0)
+_displays: set[WebSocket] = set()
+
+
+async def _broadcast(payload: dict) -> None:
+    for ws in list(_displays):
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            _displays.discard(ws)
+
+
+async def _broadcast_control() -> None:
+    driving = _controller.current_driver(time.monotonic()) is not None
+    await _broadcast({"type": "control", **_controller.state(), "driver": driving})
+
+
+@app.websocket("/ws/control")
+async def control_ws(ws: WebSocket):
+    """The projector connects as ?role=display (receives the driver's control state);
+    phones connect as ?role=controller&clientId=... and send request/release/state."""
+    await ws.accept()
+    role = ws.query_params.get("role", "controller")
+    client_id = ws.query_params.get("clientId") or str(id(ws))
+
+    if role == "display":
+        _displays.add(ws)
+        try:
+            await _broadcast_control()  # current snapshot to the new display
+            while True:
+                await ws.receive_text()  # displays don't send; this detects disconnect
+        except WebSocketDisconnect:
+            pass
+        finally:
+            _displays.discard(ws)
+        return
+
+    # controller (phone)
+    try:
+        while True:
+            raw = await ws.receive_text()
+            try:
+                msg = json.loads(raw)
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(msg, dict):
+                continue
+            now = time.monotonic()
+            mtype = msg.get("type")
+
+            if mtype == "request":
+                ok = _controller.request(client_id, now)
+                await ws.send_json({"type": "status", "driving": ok})
+            elif mtype == "release":
+                _controller.release(client_id)
+                await ws.send_json({"type": "status", "driving": False})
+                await _broadcast_control()
+            elif mtype == "state":
+                parsed = parse_control_state(msg)
+                ok = _controller.set_state(client_id, parsed, now)
+                await ws.send_json({"type": "status", "driving": ok})
+                if ok:
+                    await _broadcast_control()
+                    if "jump" in parsed:
+                        await _broadcast({"type": "jump", "target": parsed["jump"]})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if _controller.current_driver(time.monotonic()) == client_id:
+            _controller.release(client_id)
+            await _broadcast_control()

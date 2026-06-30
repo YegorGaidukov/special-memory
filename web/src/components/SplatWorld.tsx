@@ -16,6 +16,7 @@ import EditHud from "@/components/EditHud";
 import Toolbar from "@/components/Toolbar";
 import Library from "@/components/Library";
 import MemoryAudio from "@/components/MemoryAudio";
+import RemoteControlClient from "@/components/RemoteControlClient";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useTheme } from "@/hooks/useTheme";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
@@ -75,6 +76,22 @@ export default function SplatWorld() {
   // (and on disk after save). Empty in the public fly-through → no-op identity.
   const [edits, setEdits] = useState<Record<string, StoredTransform>>({});
   const records = useMemo(() => applyEdits(baseRecords, edits), [baseRecords, edits]);
+
+  // Latest records read by the (stable) remote-jump handler without reconnecting the
+  // control socket each time records change.
+  const recordsRef = useRef(records);
+  recordsRef.current = records;
+  const handleRemoteJump = useCallback((target: string) => {
+    const recs = recordsRef.current;
+    if (recs.length === 0) return;
+    const id =
+      target === "random"
+        ? recs[Math.floor(Math.random() * recs.length)].id
+        : recs.some((r) => r.id === target)
+          ? target
+          : null;
+    if (id) setTravelToId(id);
+  }, []);
 
   const manifestIds = useMemo(() => new Set(baseRecords.map((r) => r.id)), [baseRecords]);
   const pending = useMemo(
@@ -299,6 +316,7 @@ export default function SplatWorld() {
         </button>
       )}
       <ThemeToggle />
+      <RemoteControlClient onJump={handleRemoteJump} />
     </>
   );
 }
