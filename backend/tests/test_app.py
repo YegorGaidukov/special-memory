@@ -89,6 +89,59 @@ def test_asset_serving_and_guards(client):
     assert c.get("/assets/..%2f..%2fsecret").status_code in (400, 404)
 
 
+def test_post_with_audio_saves_and_sets_url(client):
+    c, public = client
+    r = c.post(
+        "/api/memories",
+        files={
+            "photo": ("a.jpg", b"\xff\xd8\xff", "image/jpeg"),
+            "audio": ("note.webm", b"OpusOpus", "audio/webm"),
+        },
+    )
+    rec = r.json()["record"]
+    assert rec["audio_url"] == f"{rec['id']}.webm"
+    assert (public / f"{rec['id']}.webm").read_bytes() == b"OpusOpus"
+
+
+def test_post_with_manual_date(client):
+    c, _ = client
+    r = c.post(
+        "/api/memories",
+        data={"captured_at": "2026-06-15"},
+        files={"photo": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")},
+    )
+    assert r.json()["record"]["captured_at"] == "2026-06-15T00:00:00.000Z"
+
+
+def test_post_scatter_placement_grounds_near_origin(client):
+    c, _ = client
+    rec = c.post(
+        "/api/memories",
+        data={"placement": "scatter"},
+        files={"photo": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")},
+    ).json()["record"]
+    pos = rec["transform"]["position"]
+    assert len(pos) == 3 and pos[1] == 0.0
+    # empty city -> scattered within empty_radius (40) of origin
+    assert (pos[0] ** 2 + pos[2] ** 2) ** 0.5 <= 40 + 1e-6
+
+
+def test_audio_url_round_trips_through_publish(client):
+    c, public = client
+    rec = c.post(
+        "/api/memories",
+        files={
+            "photo": ("a.jpg", b"\xff\xd8\xff", "image/jpeg"),
+            "audio": ("note.webm", b"snd", "audio/webm"),
+        },
+    ).json()["record"]
+    (public / f"{rec['id']}.sog").write_bytes(b"sog")
+    c.post(f"/api/memories/{rec['id']}/ingest")
+    manifest = json.loads((public / "manifest.json").read_text())
+    mem = next(m for m in manifest["memories"] if m["id"] == rec["id"])
+    assert mem["audio_url"] == f"{rec['id']}.webm"
+
+
 def test_ingest_after_assets_present(client):
     c, public = client
     rec = c.post("/api/memories", files={"photo": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")}).json()["record"]

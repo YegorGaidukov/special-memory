@@ -17,9 +17,9 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from . import config, services
 from .assets import asset_content_type, safe_asset_name
-from .exifdata import parse_placement
+from .exifdata import parse_placement, validate_captured_at
 from .ids import ext_of, make_record_id
-from .placement import placement_transform
+from .placement import placement_transform, scatter_near_cluster
 from .store import find_by_id, load_store
 from .transform_validate import is_valid_transform
 
@@ -38,6 +38,22 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + (
         f"{datetime.now(timezone.utc).microsecond // 1000:03d}Z"
     )
+
+
+# MediaRecorder output varies by browser (Chrome: webm/opus; Safari/iOS: mp4/aac).
+# Map the uploaded blob's content type to a sensible on-disk extension.
+_AUDIO_EXT = {
+    "audio/webm": ".webm",
+    "audio/ogg": ".ogg",
+    "audio/mp4": ".m4a",
+    "audio/aac": ".m4a",
+    "audio/mpeg": ".mp3",
+}
+
+
+def _audio_ext(content_type: Optional[str]) -> str:
+    base = (content_type or "").split(";")[0].strip().lower()
+    return _AUDIO_EXT.get(base, ".webm")
 
 
 def _parse_vec3(raw: Optional[str]):
@@ -75,6 +91,9 @@ async def create_memory(
     photo: UploadFile,
     camera_position: Optional[str] = Form(None),
     camera_forward: Optional[str] = Form(None),
+    placement_mode: Optional[str] = Form(None, alias="placement"),
+    captured_at: Optional[str] = Form(None),
+    audio: Optional[UploadFile] = None,
 ):
     data = await photo.read()
     if not data:
@@ -85,6 +104,7 @@ async def create_memory(
 
     uploads_dir = Path(config.UPLOADS_DIR)
     inbox_dir = Path(config.RECON_INBOX)
+    public_dir = Path(config.PUBLIC_MEMORIES_DIR)
     uploads_dir.mkdir(parents=True, exist_ok=True)
     inbox_dir.mkdir(parents=True, exist_ok=True)
     upload_path = uploads_dir / filename
@@ -92,13 +112,33 @@ async def create_memory(
     (inbox_dir / filename).write_bytes(data)
 
     placement = parse_placement(data)
-    transform = placement_transform(
-        geo=placement.get("geo"),
-        camera_position=_parse_vec3(camera_position),
-        camera_forward=_parse_vec3(camera_forward),
-        origin=config.ORIGIN,
-        standoff=config.FLY_TO_STANDOFF,
-    )
+    geo = placement.get("geo")
+
+    # Placement priority: EXIF GPS -> phone "scatter near cluster" -> camera-front -> origin.
+    if geo is None and placement_mode == "scatter":
+        position = scatter_near_cluster(services.current_memory_positions())
+        transform = {"position": position, "quaternion": [0, 0, 0, 1], "scale": [1, 1, 1]}
+    else:
+        transform = placement_transform(
+            geo=geo,
+            camera_position=_parse_vec3(camera_position),
+            camera_forward=_parse_vec3(camera_forward),
+            origin=config.ORIGIN,
+            standoff=config.FLY_TO_STANDOFF,
+        )
+
+    # Capture time: EXIF wins; else the phone-supplied manual date (validated).
+    when = placement.get("captured_at") or validate_captured_at(captured_at)
+
+    # Optional voice note: saved straight into public/memories (no reconstruction).
+    audio_url = None
+    if audio is not None:
+        audio_bytes = await audio.read()
+        if audio_bytes:
+            audio_name = f"{record_id}{_audio_ext(audio.content_type)}"
+            public_dir.mkdir(parents=True, exist_ok=True)
+            (public_dir / audio_name).write_bytes(audio_bytes)
+            audio_url = audio_name
 
     record = {
         "id": record_id,
@@ -107,11 +147,13 @@ async def create_memory(
         "thumbnail_url": "",
         "splat_url": "",
         "transform": transform,
-        "geo": placement.get("geo"),
-        "heading_deg": 0 if placement.get("geo") else None,
-        "captured_at": placement.get("captured_at"),
+        "geo": geo,
+        "heading_deg": 0 if geo else None,
+        "captured_at": when,
         "created_at": _now_iso(),
     }
+    if audio_url:
+        record["audio_url"] = audio_url
     services.add_record_locked(record)
 
     # Reconstruct inline (background thread) — SHARP never blocks the response.

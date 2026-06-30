@@ -36,6 +36,9 @@ export interface MemoryRecord {
   geo?: Geo;
   heading_deg?: number;
   created_at?: string;
+  /** Optional voice note recorded with the memory (S4). Resolved against the asset
+   *  base URL like splat_url; played as positional audio near the memory. */
+  audio_url?: string;
 }
 
 export interface CityConfig {

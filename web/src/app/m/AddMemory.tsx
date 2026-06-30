@@ -3,10 +3,12 @@
 import { useCallback, useRef, useState } from "react";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
+import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import styles from "./mobile.module.css";
 
-// Phase 2: photo pick + upload. Phase 3 adds the (auto/manual) date and the audio
-// recording, and switches placement to scatter-near-cluster. Kept intentionally bare.
+// The phone contribution: pick a photo, optionally set the date (auto-filled from
+// EXIF server-side; this is the manual fallback) and record a short voice note. The
+// memory scatters near the existing cluster (placement=scatter) — no GPS, no camera.
 type Status = "idle" | "selected" | "uploading" | "done" | "error";
 
 export default function AddMemory({ onExplore }: { onExplore: () => void }) {
@@ -15,6 +17,8 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [date, setDate] = useState("");
+  const audio = useAudioRecorder();
 
   const choose = useCallback((files: FileList | null) => {
     if (!files) return;
@@ -40,6 +44,9 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
     try {
       const form = new FormData();
       form.append("photo", file);
+      form.append("placement", "scatter");
+      if (date) form.append("captured_at", date);
+      if (audio.blob) form.append("audio", audio.blob, "note");
       const r = await fetch(`${getApiBaseUrl()}/api/memories`, { method: "POST", body: form });
       if (!r.ok) throw new Error(await r.text());
       setStatus("done");
@@ -47,7 +54,7 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
       setStatus("error");
       setError(String(err instanceof Error ? err.message : err));
     }
-  }, [file]);
+  }, [file, date, audio.blob]);
 
   if (status === "done") {
     return (
@@ -85,6 +92,39 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
 
         {status === "selected" || status === "uploading" ? (
           <>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>When was this taken? (optional)</span>
+              <input
+                type="date"
+                className={styles.dateInput}
+                value={date}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </label>
+
+            {audio.supported ? (
+              <div className={styles.audio}>
+                {audio.url ? (
+                  <>
+                    <audio src={audio.url} controls className={styles.player} />
+                    <button className={styles.ghost} onClick={audio.reset}>
+                      Re-record voice note
+                    </button>
+                  </>
+                ) : audio.recording ? (
+                  <button className={styles.recording} onClick={audio.stop}>
+                    ● Stop recording
+                  </button>
+                ) : (
+                  <button className={styles.ghost} onClick={audio.start}>
+                    🎙 Record a voice note (optional)
+                  </button>
+                )}
+                {audio.error ? <p className={styles.error}>{audio.error}</p> : null}
+              </div>
+            ) : null}
+
             <button
               className={styles.primary}
               onClick={upload}

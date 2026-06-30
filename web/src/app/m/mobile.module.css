@@ -132,3 +132,60 @@
   color: var(--danger);
   font-size: 0.9rem;
 }
+
+/* Optional fields (date + audio) */
+.field {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.fieldLabel {
+  color: var(--ink-dim);
+  font-size: 0.85rem;
+}
+
+.dateInput {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.audio {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.player {
+  width: 100%;
+}
+
+.recording {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--danger);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    background: rgba(255, 138, 138, 0.12);
+  }
+}

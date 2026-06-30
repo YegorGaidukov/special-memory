@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timezone
+from typing import Optional
 
 
 def _is_finite_number(v) -> bool:
@@ -21,6 +22,26 @@ def _to_iso_z(dt: datetime) -> str:
         dt = dt.replace(tzinfo=timezone.utc)
     dt = dt.astimezone(timezone.utc)
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+
+
+def validate_captured_at(value) -> Optional[str]:
+    """Normalise a manually-entered capture date to an ISO-Z string, or None.
+
+    Accepts a ``<input type="date">`` value (``YYYY-MM-DD`` -> midnight UTC) or a full
+    ISO 8601 datetime. Rejects empty/garbage. EXIF wins when present; this is the
+    fallback the phone supplies.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    s = value.strip()
+    try:
+        if len(s) == 10:  # YYYY-MM-DD
+            dt = datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        else:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return _to_iso_z(dt)
 
 
 def extract_placement(raw) -> dict:

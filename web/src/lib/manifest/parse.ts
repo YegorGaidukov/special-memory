@@ -71,6 +71,7 @@ function parseMemory(v: unknown, idx: number): MemoryRecord {
   if (v.geo != null) record.geo = parseGeo(v.geo, `${ctx}.geo`);
   if (v.heading_deg != null) record.heading_deg = asNumber(v.heading_deg, `${ctx}.heading_deg`);
   if (v.created_at != null) record.created_at = asString(v.created_at, `${ctx}.created_at`);
+  if (v.audio_url != null) record.audio_url = asString(v.audio_url, `${ctx}.audio_url`);
   return record;
 }
 

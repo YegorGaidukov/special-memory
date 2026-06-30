@@ -69,6 +69,23 @@ def publish_manifest() -> None:
     path.write_text(json.dumps(manifest, indent=2), encoding="utf8")
 
 
+def current_memory_positions() -> list:
+    """Positions of all memories currently visible in the city (published manifest:
+    seeds + approved). Used to scatter a phone upload near the existing cluster.
+    Falls back to the store's approved records if the manifest is unreadable."""
+    path = _manifest_path()
+    try:
+        memories = parse_manifest(json.loads(path.read_text(encoding="utf8")))["memories"]
+        return [m["transform"]["position"] for m in memories]
+    except Exception:
+        store = load_store(config.STORE_PATH)
+        return [
+            r["transform"]["position"]
+            for r in store["records"]
+            if r.get("status") == "approved" and isinstance(r.get("transform"), dict)
+        ]
+
+
 def patch_published_transform(record_id: str, transform: dict) -> bool:
     """Patch a single memory's transform directly in the published manifest (for
     hand-authored seed memories not in the store). False if missing/unreadable."""
