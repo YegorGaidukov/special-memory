@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getCameraPose } from "@/lib/camera/pose";
+import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import styles from "./DropToContribute.module.css";
 
 // DOM overlay over the explorer canvas: the only entry point for adding a memory.
@@ -48,7 +49,7 @@ export default function DropToContribute() {
       form.append("photo", picked.file);
       form.append("camera_position", JSON.stringify(pose.position));
       form.append("camera_forward", JSON.stringify(pose.forward));
-      const r = await fetch("/api/memories", { method: "POST", body: form });
+      const r = await fetch(`${getApiBaseUrl()}/api/memories`, { method: "POST", body: form });
       if (!r.ok) throw new Error(await r.text());
       setStatus("done");
       // Clear the confirmation after a few seconds.

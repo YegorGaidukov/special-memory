@@ -20,6 +20,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
 import { applyEdits } from "@/lib/transform/overlay";
 import { MAP } from "@/config/explorer";
+import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import { getResident } from "@/lib/splat/registry";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
@@ -126,7 +127,7 @@ export default function SplatWorld() {
     setSaving(true);
     setSaveError(null);
     try {
-      const r = await fetch(`/api/memories/${id}/transform`, {
+      const r = await fetch(`${getApiBaseUrl()}/api/memories/${id}/transform`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ transform: t }),

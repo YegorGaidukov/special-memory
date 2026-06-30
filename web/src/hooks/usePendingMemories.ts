@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ContribRecord } from "@/server/types";
+import { getApiBaseUrl } from "@/lib/api/baseUrl";
 
 const POLL_MS = 3000;
 
@@ -19,7 +20,7 @@ export function usePendingMemories(): ContribRecord[] {
 
     const tick = async () => {
       try {
-        const r = await fetch("/api/memories");
+        const r = await fetch(`${getApiBaseUrl()}/api/memories`);
         if (r.ok) {
           const store = await r.json();
           if (!cancelled && Array.isArray(store.records)) setRecords(store.records);

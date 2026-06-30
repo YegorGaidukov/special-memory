@@ -1,16 +1,16 @@
 // Central explorer tuning. The base URL is the only place that knows where
-// memory assets live (the dynamic asset route by default, or a CDN for the
-// exhibition).
+// memory assets live (the FastAPI backend's /assets, served same-origin behind
+// Caddy in production; a separate :8000 backend in dev — see lib/api/baseUrl).
 import { OSM_STYLE } from "@/lib/map/style";
+import { getAssetsBaseUrl } from "@/lib/api/baseUrl";
 
-// Memory assets are served by the dynamic route (app/api/asset/[name]), which
-// reads PUBLIC_MEMORIES_DIR from disk per request. This is required because the
-// GPU watcher writes a live drop's .sog/.preview.ply AFTER `next build`, and
-// Next's static public/ serving only exposes files that existed at build time
-// (so runtime-added splats 404). Override with NEXT_PUBLIC_MEMORIES_BASE_URL to
-// point at a CDN.
+// Memory assets (splats / previews / thumbnails / audio / manifest) are served by
+// the backend's GET /assets/{name}, which reads PUBLIC_MEMORIES_DIR from disk per
+// request — so a live drop's .sog (written at runtime by inline reconstruction) is
+// served without rebuilding the static frontend. NEXT_PUBLIC_MEMORIES_BASE_URL
+// overrides it (e.g. a CDN for the exhibition).
 export const MEMORIES_BASE_URL =
-  process.env.NEXT_PUBLIC_MEMORIES_BASE_URL ?? "/api/asset";
+  process.env.NEXT_PUBLIC_MEMORIES_BASE_URL ?? getAssetsBaseUrl();
 
 export const MANIFEST_URL = `${MEMORIES_BASE_URL.replace(/\/+$/, "")}/manifest.json`;
 
