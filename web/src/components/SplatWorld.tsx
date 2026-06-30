@@ -19,6 +19,7 @@ import MemoryAudio from "@/components/MemoryAudio";
 import RemoteControlClient from "@/components/RemoteControlClient";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useTheme } from "@/hooks/useTheme";
+import { VolumeMax } from "@untitledui/icons";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
 import { applyEdits } from "@/lib/transform/overlay";
 import { MAP } from "@/config/explorer";
@@ -295,24 +296,30 @@ export default function SplatWorld() {
         <button
           type="button"
           onClick={() => setSoundEnabled(true)}
-          title="Enable spatial audio"
+          title="Enable sound"
+          aria-label="Enable sound"
           style={{
             position: "fixed",
-            left: 16,
+            right: 18,
             bottom: 16,
             zIndex: 50,
-            padding: "10px 14px",
-            borderRadius: 11,
-            border: "1px solid var(--line)",
-            background: "var(--panel-solid)",
-            color: "var(--ink)",
-            font: "inherit",
-            fontSize: "0.9rem",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 34,
+            height: 34,
+            padding: 7,
+            borderRadius: 999,
+            border: "1px solid var(--line-strong)",
+            background: "var(--panel)",
+            WebkitBackdropFilter: "blur(18px) saturate(1.3)",
+            backdropFilter: "blur(18px) saturate(1.3)",
+            boxShadow: "var(--shadow-panel)",
+            color: "var(--ink-dim)",
             cursor: "pointer",
-            backdropFilter: "blur(8px)",
           }}
         >
-          🔊 Enable sound
+          <VolumeMax width="100%" height="100%" aria-hidden />
         </button>
       )}
       <ThemeToggle />

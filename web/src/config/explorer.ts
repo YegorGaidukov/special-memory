@@ -52,8 +52,10 @@ export const AUDIO = {
 export const FLY = { baseSpeed: 5, boost: 4 } as const;
 
 // Phone joystick (S4): how fast a full look-stick deflection turns the projected
-// view (radians/second of yaw / pitch). Movement reuses FLY.baseSpeed.
-export const CONTROL = { lookYaw: 2.2, lookPitch: 1.6 } as const;
+// view (radians/second of yaw / pitch). Movement reuses FLY.baseSpeed. `aimTau` is the
+// smoothing time-constant (seconds) for the gyro "magic window" look — larger eases
+// harder, hiding the ~16 Hz aim cadence and sensor jitter at the cost of lag.
+export const CONTROL = { lookYaw: 2.2, lookPitch: 1.6, aimTau: 0.1 } as const;
 
 // Click-to-travel framing.
 export const FLY_TO_DURATION_MS = 1400;

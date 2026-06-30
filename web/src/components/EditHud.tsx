@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check } from "@untitledui/icons";
+import { Check, XClose } from "@untitledui/icons";
 import type { StoredTransform } from "@/lib/transform/apply";
 import { headingToQuaternion, quaternionToHeadingDeg } from "@/lib/geo/heading";
 import styles from "./EditHud.module.css";
@@ -60,7 +60,7 @@ export default function EditHud({
         {onExit && (
           <button className={styles.close} onClick={onExit}>
             <span>Esc</span>
-            <span aria-hidden>✕</span>
+            <XClose width={14} height={14} aria-hidden />
           </button>
         )}
       </div>

@@ -6,11 +6,13 @@ import { getCameraPose } from "@/lib/camera/pose";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import styles from "./DropToContribute.module.css";
 
-// DOM overlay over the explorer canvas: the only entry point for adding a memory.
-// Drop a photo anywhere on the window → upload via POST /api/memories → stay on
-// the explorer. The new memory's placeholder sphere appears (SplatWorld polls the
-// store) and becomes a splat when reconstruction publishes it. We send the live
-// camera pose so a GPS-less photo lands in front of the current view.
+// DOM overlay over the explorer canvas: desktop drag-and-drop to add a memory.
+// The primary upload entry is now the phone (/m); the desktop keeps drag-and-drop
+// as a convenience. Drop a photo anywhere on the window → upload via
+// POST /api/memories → stay on the explorer. The new memory's placeholder sphere
+// appears (SplatWorld polls the store) and becomes a splat when reconstruction
+// publishes it. We send the live camera pose so a GPS-less photo lands in front of
+// the current view.
 //
 // Pointer-lock note: during free-fly the cursor is OS-captured and browsers don't
 // fire file-drop events, so this is naturally inert while flying — no extra code.
@@ -30,9 +32,6 @@ export default function DropToContribute() {
   // dragenter/dragleave fire per child element; count them so the overlay only
   // clears when the cursor actually leaves the window.
   const depth = useRef(0);
-  // Hidden file input backing the "share a memory" button (the explicit upload
-  // path alongside drag-and-drop).
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const upload = useCallback(async (files: FileList) => {
     const picked = pickImage(files);
@@ -96,10 +95,10 @@ export default function DropToContribute() {
 
   return (
     <>
-      {/* The only persistent upload affordance: a centered button at the bottom.
-          Opens the OS file picker; drag-and-drop still works in parallel. */}
-      <div className={styles.dock}>
-        {status !== "idle" && (
+      {/* Transient progress toast for a drag-and-drop upload (no persistent button;
+          the upload entry lives on the phone now). */}
+      {status !== "idle" && (
+        <div className={styles.dock}>
           <div
             className={styles.status}
             style={status === "error" ? { color: "#ff8080" } : undefined}
@@ -108,27 +107,8 @@ export default function DropToContribute() {
             {status === "done" && "Memory added — reconstructing…"}
             {status === "error" && error}
           </div>
-        )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            const files = e.target.files;
-            if (files && files.length) void upload(files);
-            e.target.value = ""; // allow re-picking the same file
-          }}
-        />
-        <button
-          type="button"
-          className={styles.shareBtn}
-          onClick={() => fileRef.current?.click()}
-          disabled={status === "uploading"}
-        >
-          share a memory
-        </button>
-      </div>
+        </div>
+      )}
 
       {/* Drag overlay — dims the void and confirms the drop target. */}
       {dragging && (

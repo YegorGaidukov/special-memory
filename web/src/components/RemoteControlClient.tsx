@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { getWebSocketUrl } from "@/lib/api/baseUrl";
-import { setRemoteControl, resetRemoteControl } from "@/lib/control/remoteInput";
+import { setRemoteControl, resetRemoteControl, bumpRecenter } from "@/lib/control/remoteInput";
 
 // Projector side of the joystick: subscribes to the backend control stream as the
 // "display", writes the current driver's held vector into the remote-input bridge
@@ -28,10 +28,13 @@ export default function RemoteControlClient({
             setRemoteControl({
               move: msg.move ?? { x: 0, y: 0 },
               look: msg.look ?? { x: 0, y: 0 },
+              aim: msg.aim ?? null,
               driver: !!msg.driver,
             });
           } else if (msg.type === "jump" && typeof msg.target === "string") {
             onJump(msg.target);
+          } else if (msg.type === "recenter") {
+            bumpRecenter();
           }
         } catch {
           /* ignore malformed frames */

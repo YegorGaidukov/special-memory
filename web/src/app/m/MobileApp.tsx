@@ -3,18 +3,24 @@
 import { useState } from "react";
 import AddMemory from "./AddMemory";
 import DriveMode from "./DriveMode";
+import ModeSwitch from "./ModeSwitch";
 
-// The phone has two states: contribute a memory, then drive the projected view.
-// One screen at a time, minimal chrome. Phase 3 enriches Add (date + audio +
-// scatter placement); Phase 5 fills Drive with the joystick.
-export type Mode = "add" | "drive";
+// The phone has two modes: contribute a memory, or explore the projected view. A
+// persistent glass segmented control (ModeSwitch) switches between them at any time —
+// no upload required to start exploring. Minimal chrome, one screen beneath the switch.
+export type Mode = "add" | "explore";
 
 export default function MobileApp() {
   const [mode, setMode] = useState<Mode>("add");
 
-  return mode === "add" ? (
-    <AddMemory onExplore={() => setMode("drive")} />
-  ) : (
-    <DriveMode onBack={() => setMode("add")} />
+  return (
+    <>
+      <ModeSwitch mode={mode} onChange={setMode} />
+      {mode === "add" ? (
+        <AddMemory onExplore={() => setMode("explore")} />
+      ) : (
+        <DriveMode />
+      )}
+    </>
   );
 }

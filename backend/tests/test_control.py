@@ -25,6 +25,52 @@ class TestParseControlState:
     def test_non_dict_is_zero(self):
         assert parse_control_state(None) == {"move": {"x": 0.0, "y": 0.0}, "look": {"x": 0.0, "y": 0.0}}
 
+    def test_keeps_valid_aim(self):
+        s = parse_control_state({"aim": {"yaw": 1.2, "pitch": -0.5}})
+        assert s["aim"] == {"yaw": 1.2, "pitch": -0.5}
+
+    def test_aim_omitted_when_absent(self):
+        assert "aim" not in parse_control_state({"move": {"x": 0, "y": 0}})
+
+    def test_aim_rejects_bool_and_nan(self):
+        # Any non-finite/bool axis makes the whole aim invalid (dropped) — a half-valid
+        # absolute orientation would point the camera somewhere bogus.
+        assert "aim" not in parse_control_state({"aim": {"yaw": True, "pitch": 0.2}})
+        assert "aim" not in parse_control_state({"aim": {"yaw": 0.1, "pitch": float("nan")}})
+        assert "aim" not in parse_control_state({"aim": {"yaw": float("inf"), "pitch": 0.0}})
+        assert "aim" not in parse_control_state({"aim": "nope"})
+
+    def test_aim_wraps_yaw_to_pi(self):
+        # Yaw is an angle: 3π wraps to π (within float tolerance).
+        import math
+
+        s = parse_control_state({"aim": {"yaw": 3 * math.pi, "pitch": 0}})
+        assert abs(s["aim"]["yaw"] - math.pi) < 1e-9 or abs(s["aim"]["yaw"] + math.pi) < 1e-9
+
+    def test_aim_clamps_pitch(self):
+        assert parse_control_state({"aim": {"yaw": 0, "pitch": 5}})["aim"]["pitch"] == 1.45
+        assert parse_control_state({"aim": {"yaw": 0, "pitch": -5}})["aim"]["pitch"] == -1.45
+
+    def test_keeps_recenter_flag(self):
+        assert parse_control_state({"recenter": True})["recenter"] is True
+
+    def test_drops_falsey_recenter(self):
+        assert "recenter" not in parse_control_state({"recenter": False})
+        assert "recenter" not in parse_control_state({})
+
+    def test_set_state_stores_aim(self):
+        c = Controller()
+        c.set_state("a", {"aim": {"yaw": 0.3, "pitch": 0.1}}, now=0)
+        assert c.state()["aim"] == {"yaw": 0.3, "pitch": 0.1}
+
+    def test_set_state_clears_stale_aim_on_stick(self):
+        # Switching back to the rate stick (no aim) must drop the absolute orientation
+        # so the projector leaves magic-window mode.
+        c = Controller()
+        c.set_state("a", {"aim": {"yaw": 0.3, "pitch": 0.1}}, now=0)
+        c.set_state("a", {"move": {"x": 0.2, "y": 0}}, now=1)
+        assert c.state().get("aim") is None
+
 
 class TestController:
     def test_request_grants_when_free(self):

@@ -181,7 +181,14 @@ on the ki-pc GPU box behind **Caddy/HTTPS** — a **FastAPI backend** (`backend/
 Route Handlers (deleted) and the `pipeline.watch` watcher (retired; inline reconstruction now).
 S4 adds a minimal **`/m` phone page** (`web/src/app/m/`): **Add** (photo + manual-date fallback +
 MediaRecorder voice note; `placement=scatter` drops it near the cluster) and **Drive** (touch
-joystick — left half moves, right half looks, plus "jump to a memory"). Memories with a voice note
+joystick — left half moves, right half looks, plus "jump to a memory"). Drive also has a **phone
+gyroscope "magic window" look** (default; the touch look-stick is a toggleable fallback): physically
+aim the phone to look around while movement stays on the move stick. It rides a **parallel absolute
+`aim:{yaw,pitch}` channel** alongside the rate `look`; only *relative* orientation is used (calibrated
+against a Recenter baseline captured on the projector, so no reliable absolute compass is needed and
+roll is dropped — the horizon stays level). Pure device-math + calibration/smoothing are
+unit-tested (`lib/control/{orientation,aim}.ts`); the `deviceorientation` listener + iOS
+`requestPermission()` are the sensor seam (`hooks/useDeviceOrientation.ts`). Memories with a voice note
 play **spatial audio** on the projector (`MemoryAudio`, distance-attenuated, one-time "enable sound"
 gesture). The joystick is a **WebSocket** (`/ws/control`, single-driver token in `backend/control.py`;
 projector bridge `lib/control/remoteInput` read by `Navigation`). GitHub Pages is dropped (mic needs HTTPS, the splat renderer

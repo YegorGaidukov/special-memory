@@ -5,7 +5,14 @@ import { useThree, useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { FLY, CONTROL } from "@/config/explorer";
-import { getRemoteControl } from "@/lib/control/remoteInput";
+import { getRemoteControl, getRecenterCount } from "@/lib/control/remoteInput";
+import {
+  desiredCameraAngles,
+  approachAngle,
+  anglesToForward,
+  forwardToAngles,
+  type Calibration,
+} from "@/lib/control/aim";
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const EPS = 0.001;
@@ -42,6 +49,11 @@ export default function Navigation() {
   const controls = useThree((s) => s.controls) as OrbitLike | null;
   const pressed = useRef<Set<string>>(new Set());
   const boosting = useRef(false);
+  // Magic-window (phone gyro) look state: the recenter baseline, the last recenter
+  // event seen, and the previous driver flag (to re-baseline on taking the wheel).
+  const cal = useRef<Calibration | null>(null);
+  const lastRecenter = useRef(0);
+  const wasDriving = useRef(false);
 
   // Pivot the orbit around a point ahead of the camera (not the world origin, which
   // would snap the view there). Computed once at mount, on the current line of
@@ -84,18 +96,54 @@ export default function Navigation() {
 
     // Keyboard (local) + remote phone joystick (one driver) drive the same loop.
     const rc = getRemoteControl();
+    const hasAim = rc.aim !== null;
+    // Drop the magic-window baseline when gyro look ends (rate stick or no driver), so
+    // the next gyro session re-baselines against the live heading instead of snapping.
+    if (!hasAim || !rc.driver) cal.current = null;
+
     const hasKeys = pressed.current.size > 0;
     const hasRemoteMove = Math.abs(rc.move.x) > EPS || Math.abs(rc.move.y) > EPS;
     const hasRemoteLook = Math.abs(rc.look.x) > EPS || Math.abs(rc.look.y) > EPS;
-    if (!hasKeys && !hasRemoteMove && !hasRemoteLook) return;
+    if (!hasKeys && !hasRemoteMove && !hasRemoteLook && !hasAim) {
+      wasDriving.current = rc.driver;
+      return;
+    }
 
     const forward = new THREE.Vector3();
     camera.getWorldDirection(forward);
     const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
 
-    // Look: rotate the orbit target around the camera (yaw about world-up, then pitch
-    // about the right axis, clamped near the poles). OrbitControls re-aims the camera.
-    if (hasRemoteLook && controls) {
+    // Look: absolute "magic window" aim (phone gyro) takes precedence over the rate
+    // stick. We ease the orbit target's direction toward the calibrated phone heading;
+    // OrbitControls (up = world-up) re-aims the camera, so head-roll never tilts the city.
+    if (hasAim && controls && rc.aim) {
+      const dir = new THREE.Vector3().subVectors(controls.target, camera.position);
+      const dist = dir.length() || 20;
+      const cur = forwardToAngles(dir.x / dist, dir.y / dist, dir.z / dist);
+
+      const recenter = getRecenterCount();
+      if (!cal.current || recenter !== lastRecenter.current || (rc.driver && !wasDriving.current)) {
+        cal.current = {
+          phoneYaw: rc.aim.yaw,
+          phonePitch: rc.aim.pitch,
+          camYaw: cur.yaw,
+          camPitch: cur.pitch,
+        };
+        lastRecenter.current = recenter;
+      }
+
+      const want = desiredCameraAngles(rc.aim, cal.current);
+      const yaw = approachAngle(cur.yaw, want.yaw, delta, CONTROL.aimTau);
+      const pitch = approachAngle(cur.pitch, want.pitch, delta, CONTROL.aimTau);
+      const f = anglesToForward(yaw, pitch);
+      controls.target.set(
+        camera.position.x + f.x * dist,
+        camera.position.y + f.y * dist,
+        camera.position.z + f.z * dist,
+      );
+    } else if (hasRemoteLook && controls) {
+      // Rate stick fallback: rotate the orbit target around the camera (yaw about
+      // world-up, then pitch about the right axis, clamped near the poles).
       const dir = new THREE.Vector3().subVectors(controls.target, camera.position);
       dir.applyAxisAngle(WORLD_UP, -rc.look.x * CONTROL.lookYaw * delta);
       const lookRight = new THREE.Vector3().crossVectors(dir, WORLD_UP).normalize();
@@ -106,6 +154,8 @@ export default function Navigation() {
       dir.applyAxisAngle(lookRight, clamped - pitch);
       controls.target.copy(camera.position).add(dir);
     }
+
+    wasDriving.current = rc.driver;
 
     // Move: WASD unit dirs + analog remote stick, summed; speed scales with stick
     // magnitude (capped at 1) so partial deflection flies slower.

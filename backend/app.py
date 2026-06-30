@@ -310,6 +310,8 @@ async def control_ws(ws: WebSocket):
                     await _broadcast_control()
                     if "jump" in parsed:
                         await _broadcast({"type": "jump", "target": parsed["jump"]})
+                    if "recenter" in parsed:
+                        await _broadcast({"type": "recenter"})
     except WebSocketDisconnect:
         pass
     finally:

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Check, Microphone01, Plus } from "@untitledui/icons";
+import { Check, Microphone01, Plus, Recording01 } from "@untitledui/icons";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
@@ -117,7 +117,7 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
                   </>
                 ) : audio.recording ? (
                   <button className={styles.recording} onClick={audio.stop}>
-                    ● Stop recording
+                    <Recording01 width={18} height={18} aria-hidden /> Stop recording
                   </button>
                 ) : (
                   <button className={styles.ghost} onClick={audio.start}>
