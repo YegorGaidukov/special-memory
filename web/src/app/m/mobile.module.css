@@ -1,0 +1,134 @@
+/* Phone companion (/m). Full-bleed, dark, touch-first. Uses the shared tokens from
+   globals.css; intentionally minimal — one column, one action at a time. */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  background: var(--void);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  overflow-y: auto; /* tall content (preview + buttons) scrolls on small phones */
+}
+
+.center {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sub {
+  margin: 0 0 8px;
+  color: var(--ink-dim);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+/* Large primary tap target for choosing a photo. */
+.pick {
+  width: 100%;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--field);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
+}
+.pick:active {
+  background: var(--field-hover);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.plus {
+  font-size: 2.5rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.preview {
+  width: 100%;
+  max-height: 46vh;
+  object-fit: contain;
+  border-radius: var(--r-md);
+  background: var(--field);
+}
+
+/* Buttons */
+.primary,
+.ghost {
+  width: 100%;
+  min-height: 52px;
+  border-radius: var(--r-md);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
+}
+
+.primary {
+  border: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--line), 0 8px 24px -10px var(--accent-glow);
+}
+.primary:active {
+  background: var(--accent-strong);
+}
+.primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ghost {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-dim);
+  font-weight: 500;
+  min-height: 44px;
+  font-size: 0.95rem;
+}
+.ghost:active {
+  background: var(--field);
+}
+
+.tick {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--ok);
+  font-size: 2rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}

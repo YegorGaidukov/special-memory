@@ -49,6 +49,26 @@ caddy run --config deploy/Caddyfile        # native Windows Caddy
 
 Caddy auto-upgrades WebSocket connections, so `/ws/*` (the joystick) needs no special config.
 
+## Phone entry / QR code
+
+Visitors reach the companion page at:
+
+```
+https://ki-pc.architektur.uni-weimar.de/m          # dedicated domain
+https://ki-pc.architektur.uni-weimar.de/memory-city/m   # if under a subpath (NEXT_BASE_PATH=/memory-city)
+```
+
+Generate a QR for that exact URL once and print it for the installation — no runtime dependency
+needed. Quick options:
+
+```powershell
+npx qrcode "https://ki-pc.architektur.uni-weimar.de/m" -o memory-city-qr.png   # one-off, no install
+# or any online QR generator
+```
+
+HTTPS is required: the page records audio (`getUserMedia`), which browsers only allow in a secure
+context. The Caddy/Let's Encrypt domain provides it; a plain LAN IP will not let phones record.
+
 ## Optional: containerise the backend
 
 If you prefer Docker (CUDA-in-Docker needs WSL2 GPU support on Windows), `deploy/Dockerfile` +
