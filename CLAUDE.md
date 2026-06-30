@@ -204,6 +204,15 @@ cd web && STATIC_EXPORT=1 npm run build           # -> web/out/   (NEXT_BASE_PAT
 
 ## Conventions
 
+- **Icons: Untitled UI only.** Every UI icon comes from the **`@untitledui/icons`** package (the free
+  line set) as a named, tree-shakeable import — `import { Edit05 } from "@untitledui/icons"`, rendered
+  `<Edit05 width="100%" height="100%" />` (size via `width`/`height` or the `size` prop). **Never**
+  paste inline `<svg>` icon markup, add another icon library (lucide, react-icons, heroicons…), or use
+  emoji/text glyphs (`✓`, `🎙`, `+`) as icons. Find names in the package exports
+  (`web/node_modules/@untitledui/icons/dist/index.d.ts`) or at https://www.untitledui.com/free-icons.
+  Icons default to `stroke="currentColor"` so they inherit theme color via the CSS-module vars; size
+  them to their container. `Gizmo.tsx`'s runtime-generated SVG is a 3D transform control, **not** an
+  icon — exempt. Official agent guidance: https://www.untitledui.com/react/AGENT.md
 - **TDD, with the un-testable seam isolated.** S1: test the logic we write (command construction,
   thumbnails, manifest, orchestration) with the SHARP subprocess mocked/injected; prove the real
   model with one manual smoke test. S2 mirrors this — pure logic in `web/src/lib/**` is

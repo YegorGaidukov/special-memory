@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Check } from "@untitledui/icons";
 import type { StoredTransform } from "@/lib/transform/apply";
 import { headingToQuaternion, quaternionToHeadingDeg } from "@/lib/geo/heading";
 import styles from "./EditHud.module.css";
@@ -158,7 +159,7 @@ function StatusLine({
         <span className={styles.metaLabel}>Saving…</span>
       ) : showSaved ? (
         <span className={styles.saved}>
-          <CheckIcon /> Saved
+          <Check width={13} height={13} strokeWidth={1.7} /> Saved
         </span>
       ) : selectedLabel ? (
         <span className={styles.metaLabel}>{selectedLabel}</span>
@@ -217,21 +218,3 @@ function NumberField({
   );
 }
 
-/* ── Minimal inline icons (no dependency) ─────────────────────────────────── */
-function iconProps() {
-  return {
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.7,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-}
-function CheckIcon() {
-  return (
-    <svg {...iconProps()} width={13} height={13}>
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
-  );
-}

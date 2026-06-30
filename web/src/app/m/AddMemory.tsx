@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { Check, Microphone01, Plus } from "@untitledui/icons";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
@@ -60,7 +61,9 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
     return (
       <main className={styles.screen}>
         <div className={styles.center}>
-          <div className={styles.tick} aria-hidden>✓</div>
+          <div className={styles.tick} aria-hidden>
+            <Check width={32} height={32} />
+          </div>
           <h1 className={styles.title}>Memory added</h1>
           <p className={styles.sub}>It’s finding its place in the city.</p>
           <button className={styles.primary} onClick={onExplore}>
@@ -118,7 +121,7 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
                   </button>
                 ) : (
                   <button className={styles.ghost} onClick={audio.start}>
-                    🎙 Record a voice note (optional)
+                    <Microphone01 width={18} height={18} aria-hidden /> Record a voice note (optional)
                   </button>
                 )}
                 {audio.error ? <p className={styles.error}>{audio.error}</p> : null}
@@ -138,7 +141,9 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
           </>
         ) : (
           <button className={styles.pick} onClick={() => inputRef.current?.click()}>
-            <span className={styles.plus} aria-hidden>+</span>
+            <span className={styles.plus} aria-hidden>
+              <Plus width={36} height={36} />
+            </span>
             Choose a photo
           </button>
         )}
