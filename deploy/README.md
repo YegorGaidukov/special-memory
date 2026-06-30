@@ -10,6 +10,30 @@ everything runs **same-origin** on the ki-pc GPU box behind **Caddy/HTTPS** —
 
 The **projector** is just a kiosk browser pointed at the domain; **phones** open `/m` on the same domain.
 
+## As installed on ki-pc (this box)
+
+The full stack is installed and running. Key local facts:
+
+- **conda env `sharp`** lives at `C:\Users\Yegor\.conda\envs\sharp` (Python 3.13, torch
+  `2.8.0+cu128`, verified on the RTX PRO 6000 Blackwell — `sm_120` kernels execute).
+- **Apple SHARP** checkout: `D:\Yegor\Github\ml-sharp` (`pip install -e .` → the `sharp` CLI). The
+  ~2.6 GB checkpoint is cached at `C:\Users\Yegor\.cache\torch\hub\checkpoints\`.
+- **Caddy** `v2.11.4`, copied to `C:\Users\Yegor\bin\caddy.exe` (stable path, independent of the
+  versioned winget install). Let's Encrypt cert for `ki-pc.architektur.uni-weimar.de` is issued — the
+  firewall (ports 80/443) and Ethernet are confirmed working.
+- The world starts **empty** (`web/public/memories/manifest.json` has `"memories": []`); memories
+  arrive live via the explorer drop and the `/m` phone page.
+
+**Run / restart the whole stack by hand:** double-click or run `deploy\autostart.cmd` (starts the
+backend and Caddy, each in its own minimized, self-restarting window). Individual launchers:
+`deploy\start-backend.cmd` and `deploy\start-caddy.cmd`.
+
+**Auto-start on login:** `…\Start Menu\Programs\Startup\memory-city.cmd` calls `deploy\autostart.cmd`,
+so the stack comes up when the kiosk account logs in. Delete that file to disable auto-start. (No
+admin was needed; non-elevated Caddy binds 80/443 on this box. For crash-restart-as-a-service with
+auto-login independence, an admin could instead register the two launchers as Scheduled Tasks
+`onstart`.)
+
 ## Recommended: run the backend natively in the `sharp` conda env
 
 SHARP needs native CUDA; the existing dev/exhibition setup already has the `sharp` conda env with a

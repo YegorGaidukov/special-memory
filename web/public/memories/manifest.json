@@ -6,224 +6,15 @@
   },
   "memories": [
     {
-      "id": "mem-01",
+      "id": "6K8A9649santa_pola-691b41cd",
       "status": "approved",
-      "thumbnail_url": "mem-01.jpg",
-      "splat_url": "mem-01.sog",
+      "thumbnail_url": "6K8A9649santa_pola-691b41cd.jpg",
+      "splat_url": "6K8A9649santa_pola-691b41cd.sog",
       "transform": {
         "position": [
-          33.868924167048554,
-          -2.406929325848779,
-          -76.95853565304458
-        ],
-        "quaternion": [
-          0,
-          -0.08085786137534107,
-          0,
-          0.9967256391823138
-        ],
-        "scale": 1
-      },
-      "captured_at": "2026-06-02T21:59:01Z",
-      "geo": {
-        "lat": 0,
-        "lon": 0
-      },
-      "heading_deg": 0,
-      "created_at": "2026-06-02T22:00:00Z"
-    },
-    {
-      "id": "mem-02",
-      "status": "approved",
-      "thumbnail_url": "mem-02.jpg",
-      "splat_url": "mem-02.sog",
-      "transform": {
-        "position": [
-          34.20714523707746,
-          0,
-          -4.880340069114212
-        ],
-        "quaternion": [
-          0,
-          -0.020226354881481598,
-          0,
-          -0.9997954263589172
-        ],
-        "scale": 1
-      },
-      "captured_at": "2026-06-02T21:59:01Z",
-      "geo": {
-        "lat": 0,
-        "lon": 0
-      },
-      "heading_deg": 0,
-      "created_at": "2026-06-02T22:00:00Z"
-    },
-    {
-      "id": "mem-03",
-      "status": "approved",
-      "thumbnail_url": "mem-03.jpg",
-      "splat_url": "mem-03.sog",
-      "transform": {
-        "position": [
-          -35.91482345683264,
-          0,
-          -102.52159738335314
-        ],
-        "quaternion": [
-          -0.06216435366461801,
-          0.6263614334832315,
-          0.07674269485224144,
-          0.7732512529021167
-        ],
-        "scale": 1
-      },
-      "captured_at": "2026-06-02T21:59:01Z",
-      "geo": {
-        "lat": 0,
-        "lon": 0
-      },
-      "heading_deg": 45,
-      "created_at": "2026-06-02T22:00:00Z"
-    },
-    {
-      "id": "mem-04",
-      "status": "approved",
-      "thumbnail_url": "mem-04.jpg",
-      "splat_url": "mem-04.sog",
-      "transform": {
-        "position": [
-          34.543272399294466,
-          -5.194541097431584,
-          -104.46874437841319
-        ],
-        "quaternion": [
-          0,
-          0.70710678,
-          0,
-          0.70710678
-        ],
-        "scale": 1
-      },
-      "captured_at": "2026-06-02T21:59:01Z",
-      "geo": {
-        "lat": 0,
-        "lon": 0
-      },
-      "heading_deg": 90,
-      "created_at": "2026-06-02T22:00:00Z"
-    },
-    {
-      "id": "mem-05",
-      "status": "approved",
-      "thumbnail_url": "mem-05.jpg",
-      "splat_url": "mem-05.sog",
-      "transform": {
-        "position": [
-          54.21640262143262,
-          0,
-          -90.58148798845558
-        ],
-        "quaternion": [
-          0.0027704415457873617,
-          -0.4678533834800862,
-          0.009003443006151855,
-          0.8837558906360466
-        ],
-        "scale": 1
-      },
-      "captured_at": "2026-06-02T21:59:01Z",
-      "geo": {
-        "lat": 0,
-        "lon": 0
-      },
-      "heading_deg": -45,
-      "created_at": "2026-06-02T22:00:00Z"
-    },
-    {
-      "id": "mem-06",
-      "status": "approved",
-      "thumbnail_url": "mem-06.jpg",
-      "splat_url": "mem-06.sog",
-      "transform": {
-        "position": [
-          29.059052156504134,
-          0,
-          -1.4838844534193587
-        ],
-        "quaternion": [
-          0,
-          0.9980116762260044,
-          0,
-          0.0630293115666147
-        ],
-        "scale": 1
-      },
-      "captured_at": "2026-06-02T21:59:01Z",
-      "geo": {
-        "lat": 0,
-        "lon": 0
-      },
-      "heading_deg": 135,
-      "created_at": "2026-06-02T22:00:00Z"
-    },
-    {
-      "id": "mem-08-e4487dd5",
-      "status": "approved",
-      "thumbnail_url": "mem-08-e4487dd5.jpg",
-      "splat_url": "mem-08-e4487dd5.sog",
-      "transform": {
-        "position": [
-          141.11490672963498,
-          0,
-          -275.63527570312954
-        ],
-        "quaternion": [
-          0,
-          -0.1706811202074835,
-          0,
-          0.9853263191474785
-        ],
-        "scale": 1
-      },
-      "created_at": "2026-06-04T00:19:58.047Z",
-      "geo": {
-        "lat": 52.43161035657255,
-        "lon": 10.79092028046938
-      },
-      "heading_deg": 0
-    },
-    {
-      "id": "mem-07-a56dbf82",
-      "status": "approved",
-      "thumbnail_url": "mem-07-a56dbf82.jpg",
-      "splat_url": "mem-07-a56dbf82.sog",
-      "transform": {
-        "position": [
-          73.23930306850953,
-          -3.405805880399007,
-          -74.75258342126475
-        ],
-        "quaternion": [
-          0.019395323391929974,
-          0.7361387223773267,
-          -0.0488306290658581,
-          -0.6747882427193233
-        ],
-        "scale": 1
-      },
-      "created_at": "2026-06-05T09:00:21.959Z"
-    },
-    {
-      "id": "mem-09-ee62c63c",
-      "status": "approved",
-      "thumbnail_url": "mem-09-ee62c63c.jpg",
-      "splat_url": "mem-09-ee62c63c.sog",
-      "transform": {
-        "position": [
-          60.65877902764504,
-          36.37472022032245,
-          57.71492073165248
+          9.919492043350854,
+          7.931005867225065,
+          49.22549703520402
         ],
         "quaternion": [
           0,
@@ -237,18 +28,21 @@
           1
         ]
       },
-      "created_at": "2026-06-05T11:26:30.871Z"
+      "geo": null,
+      "heading_deg": null,
+      "captured_at": "2026-06-17T15:16:43.000Z",
+      "created_at": "2026-06-30T19:03:54.953Z"
     },
     {
-      "id": "mem-06-c9b31b4d",
+      "id": "IMG_8855-43a3d324",
       "status": "approved",
-      "thumbnail_url": "mem-06-c9b31b4d.jpg",
-      "splat_url": "mem-06-c9b31b4d.sog",
+      "thumbnail_url": "IMG_8855-43a3d324.jpg",
+      "splat_url": "IMG_8855-43a3d324.sog",
       "transform": {
         "position": [
-          597.2061245085077,
-          395.360302156621,
-          318.56604957724255
+          -1.3865516303821117,
+          0.0,
+          58.311975686730655
         ],
         "quaternion": [
           0,
@@ -262,28 +56,10 @@
           1
         ]
       },
-      "created_at": "2026-06-05T11:33:51.007Z"
-    },
-    {
-      "id": "700e131360e927241b1d475dcc6e89b8-3917e8af",
-      "status": "approved",
-      "thumbnail_url": "700e131360e927241b1d475dcc6e89b8-3917e8af.jpg",
-      "splat_url": "700e131360e927241b1d475dcc6e89b8-3917e8af.sog",
-      "transform": {
-        "position": [
-          43.713461159511795,
-          -5.526124360557784,
-          -102.43803680397403
-        ],
-        "quaternion": [
-          -0.017407070123923216,
-          -0.2997968758665309,
-          -0.055289822918789665,
-          0.952240443696852
-        ],
-        "scale": 1
-      },
-      "created_at": "2026-06-05T12:47:51.981Z"
+      "geo": null,
+      "heading_deg": null,
+      "captured_at": "2026-06-21T17:03:19.000Z",
+      "created_at": "2026-06-30T19:07:24.196Z"
     }
   ]
 }

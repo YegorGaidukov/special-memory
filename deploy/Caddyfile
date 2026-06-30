@@ -12,14 +12,26 @@ ki-pc.architektur.uni-weimar.de {
 	}
 
 	# Backend: API, asset/audio/manifest serving, and the joystick WebSocket.
-	# Caddy auto-detects and upgrades the WebSocket on /ws/*.
-	reverse_proxy /api/* 127.0.0.1:8000
-	reverse_proxy /assets/* 127.0.0.1:8000
-	reverse_proxy /ws/* 127.0.0.1:8000
+	# Caddy auto-detects and upgrades the WebSocket on /ws/*. These must be `handle`
+	# blocks (not bare reverse_proxy) so the static `try_files` rewrite below cannot
+	# capture them first — `try_files` sorts ahead of `reverse_proxy` and would
+	# otherwise rewrite /api/* to /index.html and serve it from disk.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /assets/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /ws/* {
+		reverse_proxy 127.0.0.1:8000
+	}
 
 	# Static frontend (Next.js export). Point root at the absolute path on ki-pc.
-	root * C:/srv/memory-city/out
-	file_server
-	# SPA-ish fallback for client routes (e.g. /m) and Next's .html outputs.
-	try_files {path} {path}.html {path}/index.html /index.html
+	# This `handle` runs only for requests not matched by the proxied prefixes above.
+	handle {
+		root * D:/Yegor/Github/special-memory/web/out
+		# SPA-ish fallback for client routes (e.g. /m) and Next's .html outputs.
+		try_files {path} {path}.html {path}/index.html /index.html
+		file_server
+	}
 }
