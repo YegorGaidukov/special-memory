@@ -335,8 +335,9 @@ export default function SplatWorld() {
 // (spread) that blurs smoothly inward, with corners falling off radially. Unlike
 // stacked linear-gradients it has no color-stop banding and no hard overlap seams
 // where edges meet. Sizes are vmin so the falloff scales with the projection.
-// pointerEvents:none so it never intercepts clicks/drags; sits above the canvas
-// but below the toolbar/HUD (those use higher z-index).
+// pointerEvents:none so it never intercepts clicks/drags; z-index sits just above
+// the canvas (0) but below ALL chrome (the toolbar rail, share button, HUD all use
+// z-index >= 9), so it only darkens the rendered view and never dims the UI pills.
 function Vignette({ theme }: { theme: "dark" | "light" }) {
   const edge = theme === "dark" ? "5, 6, 10" : "238, 241, 246";
   return (
@@ -345,9 +346,9 @@ function Vignette({ theme }: { theme: "dark" | "light" }) {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 30,
+        zIndex: 5,
         pointerEvents: "none",
-        boxShadow: `inset 0 0 14vmin 2vmin rgba(${edge}, 1)`,
+        boxShadow: `inset 0 0 17vmin 5vmin rgba(${edge}, 1)`,
       }}
     />
   );
