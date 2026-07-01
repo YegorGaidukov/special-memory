@@ -86,6 +86,10 @@ export default function ExploreField({
     return () => window.removeEventListener("resize", measure);
   }, []);
 
+  // A component unmount mid-long-press must not fire the grab-candidate timer
+  // against a torn-down component.
+  useEffect(() => () => clearGrabCandidate(), []);
+
   const points = useMemo(
     () =>
       records.map((r) => {
@@ -119,6 +123,7 @@ export default function ExploreField({
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (grab.current) return; // an active grab owns the gesture; ignore extra fingers
     const two = twoFingers();
     if (two) {
       // Second finger down → start a pinch; cancel any single-finger pan/grab.
@@ -223,15 +228,19 @@ export default function ExploreField({
     pointers.current.delete(e.pointerId);
     clearGrabCandidate();
 
-    // Release an active grab → drop the memory here.
+    // Release an active grab → drop the memory here. While a grab is active, only
+    // its own pointer may act; any other pointer lift just deregisters and returns
+    // (it must not rearm pan/pinch underneath the grab).
     const g = grab.current;
-    if (g && g.pointerId === e.pointerId) {
-      const w = unproject({ x: e.clientX, y: e.clientY }, viewRef.current);
-      dropMemory(g.id, w.x, w.z);
-      grab.current = null;
-      setGrabbedId(null);
-      setLivePos(null);
-      return;
+    if (g) {
+      if (g.pointerId === e.pointerId) {
+        const w = unproject({ x: e.clientX, y: e.clientY }, viewRef.current);
+        dropMemory(g.id, w.x, w.z);
+        grab.current = null;
+        setGrabbedId(null);
+        setLivePos(null);
+      }
+      return; // a grab owns the gesture; a non-grab pointer lift must not rearm pan/pinch
     }
 
     if (pointers.current.size < 2) pinch.current = null;
