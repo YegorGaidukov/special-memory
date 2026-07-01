@@ -30,7 +30,7 @@ GPS, else in front of the camera) → faint placeholder sphere while the watcher
 served by a **dynamic route** (`app/api/asset/[name]`), not Next's static `public/` handler — Next only
 serves `public/` files that existed at *build* time, so a live drop's runtime-written `.sog` would 404
 on `next start`; the route reads `PUBLIC_MEMORIES_DIR` from disk per request (`MEMORIES_BASE_URL`
-defaults to `/api/asset`). The web suite is **163 Vitest specs** (pure
+defaults to `/api/asset`). The web suite is **270 Vitest specs** (pure
 geo/manifest/store/publish/exif/upload/pending/map/asset logic; the WebGL viewer,
 MapLibre→texture, and route handlers are the mocked/manual seams). **Verify on a production build**
 (`npm run build && npm run start`), not dev (HMR remounts the WebGL viewer and throws spurious
