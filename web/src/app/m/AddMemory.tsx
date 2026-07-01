@@ -109,7 +109,9 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
     ? "Voice note added"
     : audio.recording
       ? "Recording — tap to stop"
-      : "Narrate";
+      : audio.requesting
+        ? "Allow microphone…"
+        : "Narrate";
   const onNarrate = () => {
     if (audio.url) audio.reset();
     else if (audio.recording) audio.stop();
@@ -154,13 +156,17 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
         <DatePicker value={date} onChange={setDate} />
 
         {mounted && audio.supported && (
-          <button
-            type="button"
-            className={`${styles.serifButton} ${audio.url ? styles.serifButtonSet : ""}`}
-            onClick={onNarrate}
-          >
-            {narrateLabel}
-          </button>
+          <>
+            <button
+              type="button"
+              className={`${styles.serifButton} ${audio.url ? styles.serifButtonSet : ""}`}
+              onClick={onNarrate}
+              disabled={audio.requesting}
+            >
+              {narrateLabel}
+            </button>
+            {audio.error && <p className={styles.addError}>{audio.error}</p>}
+          </>
         )}
 
         <button

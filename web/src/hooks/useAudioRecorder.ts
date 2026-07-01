@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { describeMicError } from "@/lib/audio/micError";
 
 // Thin wrapper over the MediaRecorder API (the manual/un-unit-tested seam) for the
 // phone's optional voice note. getUserMedia requires a secure context (HTTPS), which
@@ -19,6 +20,7 @@ function pickMimeType(): string {
 
 export interface AudioRecorder {
   supported: boolean;
+  requesting: boolean; // getUserMedia permission request in flight
   recording: boolean;
   blob: Blob | null;
   url: string | null;
@@ -29,6 +31,7 @@ export interface AudioRecorder {
 }
 
 export function useAudioRecorder(): AudioRecorder {
+  const [requesting, setRequesting] = useState(false);
   const [recording, setRecording] = useState(false);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -50,6 +53,7 @@ export function useAudioRecorder(): AudioRecorder {
 
   const start = useCallback(async () => {
     setError(null);
+    setRequesting(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -74,11 +78,13 @@ export function useAudioRecorder(): AudioRecorder {
       setRecording(true);
     } catch (err) {
       setError(
-        err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Microphone access denied."
+        err instanceof DOMException
+          ? describeMicError(err.name, err.message)
           : String(err instanceof Error ? err.message : err),
       );
       cleanupStream();
+    } finally {
+      setRequesting(false);
     }
   }, [cleanupStream]);
 
@@ -107,5 +113,5 @@ export function useAudioRecorder(): AudioRecorder {
     };
   }, [cleanupStream]);
 
-  return { supported, recording, blob, url, error, start, stop, reset };
+  return { supported, requesting, recording, blob, url, error, start, stop, reset };
 }
