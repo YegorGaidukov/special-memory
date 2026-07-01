@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { worldBounds, fitView, project, clampZoom, zoomAboutPoint } from "@/lib/explore/minimap";
+import { worldBounds, fitView, project, unproject, clampZoom, zoomAboutPoint } from "@/lib/explore/minimap";
 
 describe("worldBounds", () => {
   it("is null for an empty set", () => {
@@ -86,5 +86,34 @@ describe("zoomAboutPoint", () => {
   it("is a no-op when the zoom is unchanged", () => {
     const pan = { x: 12, y: -7 };
     expect(zoomAboutPoint(pan, { x: 40, y: 80 }, { width: 300, height: 600 }, 3, 3)).toEqual(pan);
+  });
+});
+
+describe("unproject", () => {
+  it("round-trips with project across pan/zoom", () => {
+    const base = fitView({ minX: -40, maxX: 60, minZ: -30, maxZ: 90 }, 375, 700);
+    const view = { ...base, scale: base.scale * 2.5, panX: 37, panY: -18 };
+    for (const w of [
+      { x: 0, z: 0 },
+      { x: -40, z: 90 },
+      { x: 60, z: -30 },
+      { x: 12.5, z: 7.25 },
+    ]) {
+      const back = unproject(project(w.x, w.z, view), view);
+      expect(back.x).toBeCloseTo(w.x, 6);
+      expect(back.z).toBeCloseTo(w.z, 6);
+    }
+  });
+
+  it("maps the viewport centre to the view centre (zero pan)", () => {
+    const view = fitView({ minX: 0, maxX: 100, minZ: -50, maxZ: 50 }, 300, 600);
+    const w = unproject({ x: 150, y: 300 }, view);
+    expect(w.x).toBeCloseTo(view.centerX, 6);
+    expect(w.z).toBeCloseTo(view.centerZ, 6);
+  });
+
+  it("returns the view centre when scale is zero", () => {
+    const view = { scale: 0, centerX: 5, centerZ: -7, panX: 0, panY: 0, width: 200, height: 200 };
+    expect(unproject({ x: 123, y: 45 }, view)).toEqual({ x: 5, z: -7 });
   });
 });

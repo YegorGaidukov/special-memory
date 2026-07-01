@@ -105,6 +105,17 @@ export function project(x: number, z: number, view: MinimapView): ScreenPoint {
   };
 }
 
+/** Inverse of `project`: screen px → world point under `view`. The exact
+ *  algebraic inverse of the affine in `project`; returns the view centre if
+ *  `scale` is 0 (degenerate view, never produced by `fitView`). */
+export function unproject(screen: ScreenPoint, view: MinimapView): WorldPoint {
+  if (view.scale === 0) return { x: view.centerX, z: view.centerZ };
+  return {
+    x: (screen.x - view.width / 2 - view.panX) / view.scale + view.centerX,
+    z: (screen.y - view.height / 2 - view.panY) / view.scale + view.centerZ,
+  };
+}
+
 /** Clamp a zoom factor to `[min, max]`. */
 export function clampZoom(zoom: number, min: number, max: number): number {
   return Math.min(Math.max(zoom, min), max);
