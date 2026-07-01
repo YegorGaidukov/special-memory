@@ -3,13 +3,13 @@
 // knobs live here; the two COLOURS stay in the CSS as --wall / --light.
 export const SHADOW = {
   seed: 4,
-  displace: 180, // "spread" — noise domain-warp amplitude (px)
-  minR: 90, // blob radius range (px)
-  maxR: 100,
-  minO: 0.5, // blob opacity range
+  displace: 120, // "spread" — noise domain-warp amplitude (px)
+  minR: 80, // blob radius range (px)
+  maxR: 130,
+  minO: 0.9, // blob opacity range
   maxO: 1,
   // One blob per this much area (px²) — sets the dapple density at any viewport.
-  areaPerBlob: (250 * 600) / 6,
+  areaPerBlob: (500 * 600) / 4,
 };
 
 /** Shader-side cap for `uniform vec4 u_blobs[MAX_BLOBS]` (WebGL1 loops need a

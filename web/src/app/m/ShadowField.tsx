@@ -50,7 +50,7 @@ float fbm(vec2 p) {
 void main() {
   vec2 p = gl_FragCoord.xy / u_res * u_size;
   p.y = u_size.y - p.y; // blob layout is y-down (SVG heritage)
-  float t = u_time * 0.05;
+  float t = u_time * 0.3;
   vec2 warp = vec2(
     fbm(p * 0.007 + vec2(t, -0.7 * t)),
     fbm(p * 0.007 + vec2(-0.8 * t, t) + vec2(37.2, 11.9))
