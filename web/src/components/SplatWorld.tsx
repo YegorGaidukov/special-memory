@@ -22,6 +22,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { VolumeMax } from "@untitledui/icons";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
 import { applyEdits } from "@/lib/transform/overlay";
+import { groundMove } from "@/lib/transform/place";
 import { MAP } from "@/config/explorer";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import { getResident } from "@/lib/splat/registry";
@@ -105,6 +106,16 @@ export default function SplatWorld() {
           ? target
           : null;
     if (id) setTravelToId(id);
+  }, []);
+
+  // A memory-move streamed from the phone Explore field: slide the memory to the
+  // new ground x/z live by folding it into the edits overlay (drives Memories'
+  // re-place effect for both the splat and its ghost). The phone owns persistence
+  // (its own PATCH), so this is display-only — no write here.
+  const handleRemotePlace = useCallback((id: string, x: number, z: number) => {
+    const rec = recordsRef.current.find((r) => r.id === id);
+    if (!rec) return;
+    setEdits((e) => ({ ...e, [id]: groundMove(rec.transform, x, z) }));
   }, []);
 
   const manifestIds = useMemo(() => new Set(baseRecords.map((r) => r.id)), [baseRecords]);
@@ -338,7 +349,7 @@ export default function SplatWorld() {
         </button>
       )}
       <ThemeToggle />
-      <RemoteControlClient onJump={handleRemoteJump} onFilter={handleFilter} />
+      <RemoteControlClient onJump={handleRemoteJump} onFilter={handleFilter} onPlace={handleRemotePlace} />
     </>
   );
 }

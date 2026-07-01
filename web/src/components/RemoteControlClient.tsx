@@ -11,10 +11,13 @@ import { setRemoteControl, resetRemoteControl, bumpRecenter } from "@/lib/contro
 export default function RemoteControlClient({
   onJump,
   onFilter,
+  onPlace,
 }: {
   onJump: (target: string) => void;
   /** A timeline year-range from the phone: show only memories captured within it. */
   onFilter?: (from: number, to: number) => void;
+  /** A memory-move from the phone Explore field: slide memory `id` to world x/z. */
+  onPlace?: (id: string, x: number, z: number) => void;
 }) {
   useEffect(() => {
     let closed = false;
@@ -44,6 +47,13 @@ export default function RemoteControlClient({
             typeof msg.to === "number"
           ) {
             onFilter?.(msg.from, msg.to);
+          } else if (
+            msg.type === "place" &&
+            typeof msg.id === "string" &&
+            typeof msg.x === "number" &&
+            typeof msg.z === "number"
+          ) {
+            onPlace?.(msg.id, msg.x, msg.z);
           }
         } catch {
           /* ignore malformed frames */
@@ -63,7 +73,7 @@ export default function RemoteControlClient({
       resetRemoteControl();
       ws?.close();
     };
-  }, [onJump, onFilter]);
+  }, [onJump, onFilter, onPlace]);
 
   return null;
 }
