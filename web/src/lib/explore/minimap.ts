@@ -104,3 +104,29 @@ export function project(x: number, z: number, view: MinimapView): ScreenPoint {
     y: (z - view.centerZ) * view.scale + view.height / 2 + view.panY,
   };
 }
+
+/** Clamp a zoom factor to `[min, max]`. */
+export function clampZoom(zoom: number, min: number, max: number): number {
+  return Math.min(Math.max(zoom, min), max);
+}
+
+/**
+ * New pan that keeps the world point currently under the `focal` screen point
+ * fixed while the zoom multiplier changes from `prevZoom` to `nextZoom`
+ * (pinch/wheel "zoom toward the fingers"). Works purely in screen space via the
+ * zoom ratio — the fitted base scale cancels out, so callers pass the multiplier,
+ * not px-per-metre. `viewport` is the plotted area size in px.
+ */
+export function zoomAboutPoint(
+  pan: ScreenPoint,
+  focal: ScreenPoint,
+  viewport: { width: number; height: number },
+  prevZoom: number,
+  nextZoom: number,
+): ScreenPoint {
+  const r = prevZoom === 0 ? 1 : nextZoom / prevZoom;
+  return {
+    x: (focal.x - viewport.width / 2) * (1 - r) + pan.x * r,
+    y: (focal.y - viewport.height / 2) * (1 - r) + pan.y * r,
+  };
+}

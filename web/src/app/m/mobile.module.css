@@ -508,25 +508,6 @@
 .padRingDashed {
   border-style: dashed;
 }
-/* The thumb dot tracks the finger within a pad. Hidden at rest so the rings read as
-   empty outlines (like the mock); fades in only while the pad is touched. */
-.padThumb {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 52px;
-  height: 52px;
-  margin: -26px 0 0 -26px;
-  border-radius: 50%;
-  background: rgb(var(--ink) / 0.14);
-  opacity: 0;
-  pointer-events: none;
-  will-change: transform;
-  transition: opacity 140ms ease;
-}
-.padThumbOn {
-  opacity: 1;
-}
 .padLabel {
   font-family: var(--mono);
   font-size: var(--fs-micro);

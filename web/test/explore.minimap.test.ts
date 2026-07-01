@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { worldBounds, fitView, project } from "@/lib/explore/minimap";
+import { worldBounds, fitView, project, clampZoom, zoomAboutPoint } from "@/lib/explore/minimap";
 
 describe("worldBounds", () => {
   it("is null for an empty set", () => {
@@ -55,5 +55,36 @@ describe("fitView + project", () => {
   it("applies pan offset", () => {
     const view = { scale: 2, centerX: 0, centerZ: 0, panX: 20, panY: -10, width: 300, height: 600 };
     expect(project(0, 0, view)).toEqual({ x: 170, y: 290 });
+  });
+});
+
+describe("clampZoom", () => {
+  it("clamps to the range", () => {
+    expect(clampZoom(0.1, 0.6, 12)).toBe(0.6);
+    expect(clampZoom(50, 0.6, 12)).toBe(12);
+    expect(clampZoom(3, 0.6, 12)).toBe(3);
+  });
+});
+
+describe("zoomAboutPoint", () => {
+  it("keeps the world point under the focal point fixed across a zoom change", () => {
+    const base = { scale: 2, centerX: 0, centerZ: 0, panX: 0, panY: 0, width: 300, height: 600 };
+    const focal = project(10, 5, base); // some world point's screen position
+    const nextPan = zoomAboutPoint(
+      { x: base.panX, y: base.panY },
+      focal,
+      { width: base.width, height: base.height },
+      1,
+      2, // zoom in 2×
+    );
+    const zoomed = { ...base, scale: base.scale * 2, panX: nextPan.x, panY: nextPan.y };
+    const after = project(10, 5, zoomed);
+    expect(after.x).toBeCloseTo(focal.x, 6);
+    expect(after.y).toBeCloseTo(focal.y, 6);
+  });
+
+  it("is a no-op when the zoom is unchanged", () => {
+    const pan = { x: 12, y: -7 };
+    expect(zoomAboutPoint(pan, { x: 40, y: 80 }, { width: 300, height: 600 }, 3, 3)).toEqual(pan);
   });
 });

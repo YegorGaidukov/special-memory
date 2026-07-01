@@ -19,8 +19,10 @@ import styles from "./mobile.module.css";
 const SEND_MS = 60;
 const MOVE_RADIUS = 70;
 const LOOK_RADIUS = 74;
-const THUMB_TRAVEL = 50; // px the thumb dot travels at full deflection
 
+// A pad's joystick origin is the point where the finger first landed (NOT the ring centre),
+// so the ring is just a guide for where to place your thumb — deflection starts at zero from
+// wherever you touched, and nothing moves until you drag away from that point.
 type Pad = { id: number; cx: number; cy: number };
 
 export default function DriveMode({
@@ -36,11 +38,6 @@ export default function DriveMode({
   const { status: gyroStatus, enable: enableGyro, disable: disableGyro, read: readAim } =
     useDeviceOrientation();
   const [gyro, setGyro] = useState(false);
-  const [thumbMove, setThumbMove] = useState({ x: 0, y: 0 });
-  const [thumbLook, setThumbLook] = useState({ x: 0, y: 0 });
-  // The pads read as empty rings at rest; the thumb only appears while touched.
-  const [moveOn, setMoveOn] = useState(false);
-  const [lookOn, setLookOn] = useState(false);
 
   const move = useRef({ x: 0, y: 0 });
   const look = useRef({ x: 0, y: 0 });
@@ -95,15 +92,13 @@ export default function DriveMode({
 
   const padDown = (which: "move" | "look") => (e: React.PointerEvent) => {
     if (which === "look" && gyro) return; // gyro owns look
-    const r = e.currentTarget.getBoundingClientRect();
-    const pad: Pad = { id: e.pointerId, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    // Anchor the joystick origin where the finger landed, not the ring centre.
+    const pad: Pad = { id: e.pointerId, cx: e.clientX, cy: e.clientY };
     e.currentTarget.setPointerCapture(e.pointerId);
     if (which === "move") {
       moveP.current = pad;
-      setMoveOn(true);
     } else {
       lookP.current = pad;
-      setLookOn(true);
     }
     ensureDriving();
     padMoveHandler(which)(e);
@@ -115,23 +110,17 @@ export default function DriveMode({
     const v = joystickVector(e.clientX - p.cx, e.clientY - p.cy, radius);
     if (which === "move") {
       move.current = { x: v.x, y: -v.y }; // up = forward
-      setThumbMove({ x: v.x * THUMB_TRAVEL, y: v.y * THUMB_TRAVEL });
     } else {
       look.current = { x: v.x, y: v.y }; // down = look down
-      setThumbLook({ x: v.x * THUMB_TRAVEL, y: v.y * THUMB_TRAVEL });
     }
   };
   const padUp = (which: "move" | "look") => (e: React.PointerEvent) => {
     if (which === "move" && moveP.current?.id === e.pointerId) {
       moveP.current = null;
       move.current = { x: 0, y: 0 };
-      setThumbMove({ x: 0, y: 0 });
-      setMoveOn(false);
     } else if (which === "look" && lookP.current?.id === e.pointerId) {
       lookP.current = null;
       look.current = { x: 0, y: 0 };
-      setThumbLook({ x: 0, y: 0 });
-      setLookOn(false);
     }
     maybeRelease();
   };
@@ -190,12 +179,7 @@ export default function DriveMode({
             onPointerMove={padMoveHandler("look")}
             onPointerUp={padUp("look")}
             onPointerCancel={padUp("look")}
-          >
-            <span
-              className={`${styles.padThumb} ${lookOn ? styles.padThumbOn : ""}`}
-              style={{ transform: `translate(${thumbLook.x}px, ${thumbLook.y}px)` }}
-            />
-          </div>
+          />
           <span className={styles.padLabel}>LOOK</span>
         </div>
 
@@ -206,12 +190,7 @@ export default function DriveMode({
             onPointerMove={padMoveHandler("move")}
             onPointerUp={padUp("move")}
             onPointerCancel={padUp("move")}
-          >
-            <span
-              className={`${styles.padThumb} ${moveOn ? styles.padThumbOn : ""}`}
-              style={{ transform: `translate(${thumbMove.x}px, ${thumbMove.y}px)` }}
-            />
-          </div>
+          />
           <span className={styles.padLabel}>MOVE</span>
         </div>
       </div>
