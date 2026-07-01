@@ -158,9 +158,6 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
         {error && <p className={styles.addError}>{error}</p>}
       </div>
 
-      <button className={styles.addSecondary} onClick={() => photoInput.current?.click()}>
-        Choose another photo
-      </button>
     </main>
   );
 }
