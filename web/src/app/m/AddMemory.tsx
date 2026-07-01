@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "@untitledui/icons";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
+import { captureIsoDay } from "@/lib/exif/captureDate";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import DatePicker from "./DatePicker";
 import styles from "./mobile.module.css";
@@ -30,6 +31,9 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // Guards a slow EXIF parse of an older pick from overwriting a newer one.
+  const pickSeq = useRef(0);
+
   const choose = useCallback((files: FileList | null) => {
     if (!files) return;
     const picked = pickImage(files);
@@ -45,6 +49,20 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
     });
     setError(null);
     setStatus("idle");
+    // The date belongs to the photo: reset it, then prefill from EXIF when present.
+    // exifr is imported lazily so the page load stays light.
+    setDate("");
+    const seq = ++pickSeq.current;
+    void (async () => {
+      try {
+        const exifr = (await import("exifr")).default;
+        const raw: unknown = await exifr.parse(picked.file, ["DateTimeOriginal"]);
+        const day = captureIsoDay(raw);
+        if (day && pickSeq.current === seq) setDate(day);
+      } catch {
+        // No/unreadable EXIF (iOS sometimes strips it converting HEIC) — manual date remains.
+      }
+    })();
   }, []);
 
   const upload = useCallback(async () => {
