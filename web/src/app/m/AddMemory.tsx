@@ -5,6 +5,7 @@ import { Plus } from "@untitledui/icons";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import { captureIsoDay } from "@/lib/exif/captureDate";
+import { advance, mayAdvance, showsAdded, type AddPhase } from "@/lib/upload/addFlow";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import DatePicker from "./DatePicker";
 import styles from "./mobile.module.css";
@@ -12,13 +13,11 @@ import styles from "./mobile.module.css";
 // 5b Add screen: a feathered photo circle + inline serif fields (Name / Date / Narrate),
 // all floating on the shadow field — no boxes. Tap the circle to choose a photo; name
 // it, optionally date it (manual fallback for missing EXIF) and record a voice note;
-// then ADD TO THE CITY uploads (placement=scatter, near the cluster). On success the
-// transient "Memory added" state auto-advances to Explore.
-type Status = "idle" | "uploading" | "done" | "error";
-
+// then ADD TO THE CITY shows "Memory added" immediately (optimistic — the photo is
+// still uploading behind it) and drifts to Explore only once the POST succeeds.
 export default function AddMemory({ onAdded }: { onAdded: () => void }) {
   const photoInput = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<Status>("idle");
+  const [phase, setPhase] = useState<AddPhase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -38,7 +37,6 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
     if (!files) return;
     const picked = pickImage(files);
     if ("error" in picked) {
-      setStatus("error");
       setError(picked.error);
       return;
     }
@@ -48,7 +46,6 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
       return URL.createObjectURL(picked.file);
     });
     setError(null);
-    setStatus("idle");
     // The date belongs to the photo: reset it, then prefill from EXIF when present.
     // exifr is imported lazily so the page load stays light.
     setDate("");
@@ -67,7 +64,7 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
 
   const upload = useCallback(async () => {
     if (!file) return;
-    setStatus("uploading");
+    setPhase((p) => advance(p, "submit")); // optimistic: added screen shows now
     setError(null);
     try {
       const form = new FormData();
@@ -78,24 +75,26 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
       if (audio.blob) form.append("audio", audio.blob, "note");
       const r = await fetch(`${getApiBaseUrl()}/api/memories`, { method: "POST", body: form });
       if (!r.ok) throw new Error(await r.text());
-      setStatus("done");
+      setPhase((p) => advance(p, "succeed"));
     } catch (err) {
-      setStatus("error");
+      // Back to the form (all entered state is retained) with the error line shown.
+      setPhase((p) => advance(p, "fail"));
       setError(String(err instanceof Error ? err.message : err));
     }
   }, [file, name, date, audio.blob]);
 
-  // "Memory added" is a transient state — it settles, then drifts to Explore. Tapping
-  // it advances immediately.
+  // "Memory added" shows immediately; the drift to Explore starts only after the POST
+  // succeeds (a slow upload just lingers on the calm added screen). Tapping advances
+  // immediately — once settled.
   useEffect(() => {
-    if (status !== "done") return;
+    if (!mayAdvance(phase)) return;
     const t = setTimeout(onAdded, 2600);
     return () => clearTimeout(t);
-  }, [status, onAdded]);
+  }, [phase, onAdded]);
 
-  if (status === "done") {
+  if (showsAdded(phase)) {
     return (
-      <main className={styles.screen} onClick={onAdded}>
+      <main className={styles.screen} onClick={() => mayAdvance(phase) && onAdded()}>
         <h1 className={styles.addedTitle}>Memory added</h1>
         <p className={styles.addedSub}>
           It’s finding its place
@@ -168,9 +167,9 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
           type="button"
           className={styles.addAction}
           onClick={upload}
-          disabled={!file || status === "uploading"}
+          disabled={!file}
         >
-          {status === "uploading" ? "Adding…" : "Add to the city"}
+          Add to the city
         </button>
 
         {error && <p className={styles.addError}>{error}</p>}
