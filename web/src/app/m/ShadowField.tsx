@@ -100,7 +100,12 @@ export default function ShadowField() {
   const blobs = useMemo(() => makeBlobs(w, h), [w, h]);
 
   return (
-    <svg className={styles.field} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden>
+    <svg
+      className={`${styles.field} ${reduced ? "" : styles.fieldDrift}`}
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      aria-hidden
+    >
       <defs>
         <filter id="cmc-shadow" x="-30%" y="-30%" width="160%" height="160%">
           <feTurbulence
@@ -139,7 +144,7 @@ export default function ShadowField() {
           presentation attributes don't resolve var(). The ellipses inherit fill from
           the group. */}
       <rect width={w} height={h} style={{ fill: "var(--wall)" }} />
-      <g filter="url(#cmc-shadow)" className={reduced ? undefined : styles.drift} style={{ fill: "var(--light)" }}>
+      <g filter="url(#cmc-shadow)" style={{ fill: "var(--light)" }}>
         {blobs.map((e, i) => (
           <ellipse key={i} cx={e.cx} cy={e.cy} rx={e.rx} ry={e.ry} opacity={e.o} />
         ))}

@@ -12,7 +12,15 @@
 
 .root {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Dynamic viewport height, not inset:0 / 100vh — on iOS Safari those resolve to the
+     LARGE viewport (toolbar hidden), so bottom-anchored UI (timeline, secondary action)
+     hides behind the browser chrome and the tall content overflows. dvh tracks the
+     actually-visible area. Fallback to vh for pre-15.4 iOS. */
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
@@ -23,7 +31,10 @@
   --light: #fbf6ea; /* light dapples (shadow-field ellipses) */
   --glass: rgb(255 255 255 / 0.35);
   --pad: 32px; /* screen side inset */
-  --ring: min(280px, 66vw); /* LOOK / MOVE pad diameter — dominant nav element */
+  /* LOOK / MOVE pad diameter. Capped by height (dvh) as well as width so the two
+     stacked rings always fit the visible viewport — on a real phone (short Safari
+     viewport) a width-only cap overflowed into the tabs and timeline. */
+  --ring: min(280px, 66vw, 30dvh);
   --serif: var(--font-newsreader), Georgia, serif;
   --mono: var(--font-geist-mono), ui-monospace, monospace;
 
@@ -59,21 +70,25 @@
   background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='240'%3E%3Cfilter%20id='gf'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.8'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23gf)'/%3E%3C/svg%3E");
 }
 
-/* Field drift (the ellipse masses travel + breathe) — one shared animation behind
-   every mode. transform-box makes scale pivot on the group's own box; gated on
-   reduced-motion. */
-.drift {
-  transform-box: fill-box;
+/* Field drift — the whole shadow field slowly travels + breathes. Applied to the <svg>
+   DOM element (not the filtered inner <g>): iOS Safari won't animate SMIL filter attrs
+   and is flaky animating CSS transforms on filtered SVG groups, but a CSS transform on
+   the svg node itself composites reliably (and cheaply — the filter output is cached,
+   only the layer moves). Chrome/FF additionally get the feTurbulence morph via SMIL.
+   Edge reveal from the translate is invisible: behind the svg is --wall, the same colour
+   as the field rect. Gated on reduced-motion. */
+.fieldDrift {
   transform-origin: center;
-  animation: drift 27s ease-in-out infinite;
+  animation: drift 22s ease-in-out infinite;
+  will-change: transform;
 }
 @keyframes drift {
-  0%, 100% { transform: translate(0, 0) scale(1.02); }
-  33% { transform: translate(-20px, 11px) scale(1.08); }
-  66% { transform: translate(12px, -9px) scale(1.04); }
+  0%, 100% { transform: translate(0, 0) scale(1.04); }
+  33% { transform: translate(-26px, 16px) scale(1.1); }
+  66% { transform: translate(18px, -12px) scale(1.06); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .drift { animation: none !important; }
+  .fieldDrift { animation: none !important; }
 }
 
 /* --- shared chrome: mode tabs ------------------------------------------------ */
@@ -119,7 +134,10 @@
 
 .addContent {
   position: absolute;
-  top: max(250px, calc(env(safe-area-inset-top) + 132px));
+  /* Clamp the drop-down against dvh so the block doesn't collide with the bottom
+     "Choose another photo" on a short phone viewport — the px value alone assumed a
+     tall (~900px) screen. */
+  top: min(max(100px, calc(env(safe-area-inset-top) + 132px)), 26dvh);
   left: var(--pad);
   right: var(--pad);
   display: flex;
@@ -437,7 +455,7 @@
 /* Gyro toggle — the gyroscope glyph, centred under the tabs (not a corner button). */
 .gyroBtn {
   position: absolute;
-  top: max(64px, calc(env(safe-area-inset-top) + 30px));
+  top: max(52px, calc(env(safe-area-inset-top) + 30px));
   left: 50%;
   transform: translateX(-50%);
   width: 42px;
