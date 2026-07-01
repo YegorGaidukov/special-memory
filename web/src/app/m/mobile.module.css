@@ -381,7 +381,13 @@
 }
 .memoryLabel {
   position: absolute;
-  transform: translate(-50%, -50%);
+  /* Positioned via an inline `transform` (compositor path), NOT left/top: panning
+     rewrites every label's position each frame, and left/top forces a full
+     layout/reflow of all N labels per pointer-move (the Explore-pan jank). A
+     transform only paints/composites. The inline value carries the centering
+     (translate(-50%,-50%)) and, while grabbed, the lift scale. */
+  left: 0;
+  top: 0;
   font-family: var(--serif);
   font-weight: 300;
   font-size: var(--fs-label);
@@ -401,7 +407,8 @@
 .memoryLabelGrabbed {
   z-index: 10;
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1.28);
+  /* The lift scale is applied in the inline transform (see .memoryLabel) so it
+     composes with the label's live position instead of overriding it. */
   color: rgb(var(--ink));
   text-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
   cursor: grabbing;

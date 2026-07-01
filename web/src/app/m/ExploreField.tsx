@@ -292,7 +292,12 @@ export default function ExploreField({
             key={rec.id}
             type="button"
             className={`${styles.memoryLabel} ${grabbing ? styles.memoryLabelGrabbed : visible ? "" : styles.memoryLabelDim}`}
-            style={{ left: p.x, top: p.y }}
+            // Position via transform, not left/top: a transform composites without
+            // forcing layout, so panning (which re-projects every label each frame)
+            // doesn't reflow the whole field. Centering + the grab lift ride along.
+            style={{
+              transform: `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)${grabbing ? " scale(1.28)" : ""}`,
+            }}
             onPointerDown={(e) => onLabelPointerDown(e, rec.id)}
             onClick={() => travelTo(rec)}
           >
