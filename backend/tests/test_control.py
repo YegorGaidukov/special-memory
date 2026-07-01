@@ -1,4 +1,4 @@
-from backend.control import Controller, parse_control_state
+from backend.control import Controller, parse_control_state, parse_place
 
 
 class TestParseControlState:
@@ -146,3 +146,27 @@ class TestController:
         c.set_state("a", {"move": {"x": 1, "y": 0}}, now=0)
         c.set_state("a", {"move": {"x": 0.2, "y": 0}}, now=5)
         assert c.current_driver(now=7) == "a"
+
+
+class TestParsePlace:
+    def test_keeps_valid_move(self):
+        assert parse_place({"id": " mem-01 ", "x": 12.5, "z": -3}) == {
+            "id": "mem-01",
+            "x": 12.5,
+            "z": -3.0,
+        }
+
+    def test_drops_empty_or_non_string_id(self):
+        assert parse_place({"id": "", "x": 1, "z": 2}) is None
+        assert parse_place({"id": 5, "x": 1, "z": 2}) is None
+        assert parse_place({"x": 1, "z": 2}) is None
+
+    def test_drops_non_finite_coords(self):
+        assert parse_place({"id": "m", "x": float("nan"), "z": 0}) is None
+        assert parse_place({"id": "m", "x": 0, "z": float("inf")}) is None
+        assert parse_place({"id": "m", "x": True, "z": 0}) is None
+        assert parse_place({"id": "m", "z": 0}) is None
+
+    def test_non_dict_is_none(self):
+        assert parse_place(None) is None
+        assert parse_place([1, 2, 3]) is None

@@ -65,6 +65,21 @@ def _parse_filter(raw):
     return {"from": lo, "to": hi}
 
 
+def parse_place(raw):
+    """Validate a memory-move event ``{id, x, z}`` (id a non-empty string, x/z
+    finite numbers). Returns ``{"id", "x", "z"}`` or ``None`` if anything is
+    missing/invalid — a half-valid move would drop the memory at a bogus ground
+    position. Handled as a standalone event, independent of the drive token."""
+    if not isinstance(raw, dict):
+        return None
+    mid = raw.get("id")
+    if not isinstance(mid, str) or not mid.strip():
+        return None
+    if not _finite(raw.get("x")) or not _finite(raw.get("z")):
+        return None
+    return {"id": mid.strip(), "x": float(raw["x"]), "z": float(raw["z"])}
+
+
 def parse_control_state(raw) -> dict:
     """Validate an untrusted control message into ``{move, look, aim?, jump?, recenter?, filter?}``.
 

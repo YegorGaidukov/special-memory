@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from . import config, services
-from .control import Controller, parse_control_state
+from .control import Controller, parse_control_state, parse_place
 from .assets import asset_content_type, safe_asset_name
 from .exifdata import parse_placement, validate_captured_at
 from .ids import ext_of, make_record_id
@@ -319,6 +319,14 @@ async def control_ws(ws: WebSocket):
                         await _broadcast(
                             {"type": "filter", "from": parsed["filter"]["from"], "to": parsed["filter"]["to"]}
                         )
+            elif mtype == "place":
+                # Curation, not driving: relay a memory-move to the display(s)
+                # without touching the single-driver token or the control state.
+                parsed = parse_place(msg)
+                if parsed is not None:
+                    await _broadcast(
+                        {"type": "place", "id": parsed["id"], "x": parsed["x"], "z": parsed["z"]}
+                    )
     except WebSocketDisconnect:
         pass
     finally:
