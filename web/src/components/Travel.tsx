@@ -60,7 +60,7 @@ export default function Travel({
       position: origin,
       lookAt: [origin[0] + dir.x * 10, origin[1] + dir.y * 10, origin[2] + dir.z * 10] as Vec3,
     };
-    const to = framePoseForRecord(hit, origin, FLY_TO_STANDOFF);
+    const to = framePoseForRecord(hit, FLY_TO_STANDOFF);
     fly.current = makeFlyTo(from, to, FLY_TO_DURATION_MS);
     flyElapsed.current = 0;
     flyTarget.current = hit;

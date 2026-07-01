@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { joystickVector } from "@/lib/control/input";
+import { joystickVector, applyExpo } from "@/lib/control/input";
 
 describe("joystickVector", () => {
   it("is zero at the origin", () => {
@@ -37,5 +37,31 @@ describe("joystickVector", () => {
 
   it("guards a zero radius", () => {
     expect(joystickVector(10, 10, 0)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("applyExpo", () => {
+  it("leaves the ±1 endpoints unchanged", () => {
+    expect(applyExpo(1, 0.65)).toBeCloseTo(1, 6);
+    expect(applyExpo(-1, 0.65)).toBeCloseTo(-1, 6);
+  });
+
+  it("leaves the centre at zero", () => {
+    expect(applyExpo(0, 0.65)).toBe(0);
+  });
+
+  it("is the identity when e = 0 (linear)", () => {
+    expect(applyExpo(0.37, 0)).toBeCloseTo(0.37, 6);
+    expect(applyExpo(-0.8, 0)).toBeCloseTo(-0.8, 6);
+  });
+
+  it("is gentler near the centre for e > 0", () => {
+    expect(applyExpo(0.5, 0.65)).toBeLessThan(0.5);
+    expect(Math.abs(applyExpo(0.5, 0.65))).toBeGreaterThan(0);
+  });
+
+  it("preserves sign", () => {
+    expect(applyExpo(-0.5, 0.65)).toBeLessThan(0);
+    expect(applyExpo(0.5, 0.65)).toBeGreaterThan(0);
   });
 });

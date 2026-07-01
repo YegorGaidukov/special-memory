@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { FLY, CONTROL } from "@/config/explorer";
 import { getRemoteControl, getRecenterCount } from "@/lib/control/remoteInput";
+import { applyExpo } from "@/lib/control/input";
 import {
   desiredCameraAngles,
   approachAngle,
@@ -145,11 +146,12 @@ export default function Navigation() {
       // Rate stick fallback: rotate the orbit target around the camera (yaw about
       // world-up, then pitch about the right axis, clamped near the poles).
       const dir = new THREE.Vector3().subVectors(controls.target, camera.position);
-      dir.applyAxisAngle(WORLD_UP, -rc.look.x * CONTROL.lookYaw * delta);
+      // Expo response: gentle near centre, full speed at full deflection.
+      dir.applyAxisAngle(WORLD_UP, -applyExpo(rc.look.x, CONTROL.lookExpo) * CONTROL.lookYaw * delta);
       const lookRight = new THREE.Vector3().crossVectors(dir, WORLD_UP).normalize();
       const horiz = Math.hypot(dir.x, dir.z);
       const pitch = Math.atan2(dir.y, horiz);
-      const wanted = pitch + -rc.look.y * CONTROL.lookPitch * delta;
+      const wanted = pitch + -applyExpo(rc.look.y, CONTROL.lookExpo) * CONTROL.lookPitch * delta;
       const clamped = Math.max(-1.45, Math.min(1.45, wanted)); // ~±83°, avoid flip
       dir.applyAxisAngle(lookRight, clamped - pitch);
       controls.target.copy(camera.position).add(dir);

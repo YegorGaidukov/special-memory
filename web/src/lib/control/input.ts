@@ -32,3 +32,13 @@ export function joystickVector(
   }
   return { x, y };
 }
+
+/**
+ * RC-transmitter "expo" response curve: gentle near the centre for fine control,
+ * unchanged at the ±1 endpoints so full deflection still reaches full speed.
+ * Blends linear and cubic by `e` ∈ [0,1] (0 = linear, 1 = pure cubic). Preserves
+ * sign. Applied to a look stick's normalized deflection before the turn-rate gain.
+ */
+export function applyExpo(x: number, e: number): number {
+  return (1 - e) * x + e * x * x * x;
+}
