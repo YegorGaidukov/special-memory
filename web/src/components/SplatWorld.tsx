@@ -331,10 +331,12 @@ export default function SplatWorld() {
 // A soft edge-darkening overlay. On a projector the image has a hard rectangular
 // cutoff; darkening each edge into the void color melts that border into the ambient
 // so the picture reads as glowing out of darkness rather than a bright rectangle.
-// An inset box-shadow (void-colored) does this in one paint: a solid edge ring
-// (spread) that blurs smoothly inward, with corners falling off radially. Unlike
-// stacked linear-gradients it has no color-stop banding and no hard overlap seams
-// where edges meet. Sizes are vmin so the falloff scales with the projection.
+// Stacked void-colored inset box-shadows do this in one paint, with no color-stop
+// banding (the reason we left linear-gradients) and no hard overlap seams. The
+// layers build depth: a tight opaque rim (big spread, small blur) makes the very
+// edge FULLY void so no image bleeds through, a mid layer carries the strong
+// falloff, and a wide soft layer reaches gently toward the centre. Corners fall off
+// radially. Sizes are vmin so it scales with the projection.
 // pointerEvents:none so it never intercepts clicks/drags; z-index sits just above
 // the canvas (0) but below ALL chrome (the toolbar rail, share button, HUD all use
 // z-index >= 9), so it only darkens the rendered view and never dims the UI pills.
@@ -348,7 +350,11 @@ function Vignette({ theme }: { theme: "dark" | "light" }) {
         inset: 0,
         zIndex: 5,
         pointerEvents: "none",
-        boxShadow: `inset 0 0 17vmin 5vmin rgba(${edge}, 1)`,
+        boxShadow: [
+          `inset 0 0 6vmin 7vmin rgba(${edge}, 1)`, // opaque rim — kills image at the very edge
+          `inset 0 0 20vmin 5vmin rgba(${edge}, 1)`, // strong falloff
+          `inset 0 0 34vmin 0 rgba(${edge}, 0.55)`, // soft reach inward
+        ].join(", "),
       }}
     />
   );
