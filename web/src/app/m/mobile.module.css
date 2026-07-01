@@ -51,13 +51,11 @@
 
 /* --- shared background layers ------------------------------------------------ */
 
+/* The SVG just fills its drift wrapper; positioning + z-index + drift live on .fieldDrift. */
 .field {
-  position: absolute;
-  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  z-index: 0;
-  pointer-events: none;
 }
 
 .grain {
@@ -70,14 +68,20 @@
   background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='240'%3E%3Cfilter%20id='gf'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.8'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23gf)'/%3E%3C/svg%3E");
 }
 
-/* Field drift — the whole shadow field slowly travels + breathes. Applied to the <svg>
-   DOM element (not the filtered inner <g>): iOS Safari won't animate SMIL filter attrs
-   and is flaky animating CSS transforms on filtered SVG groups, but a CSS transform on
-   the svg node itself composites reliably (and cheaply — the filter output is cached,
-   only the layer moves). Chrome/FF additionally get the feTurbulence morph via SMIL.
-   Edge reveal from the translate is invisible: behind the svg is --wall, the same colour
-   as the field rect. Gated on reduced-motion. */
+/* Field drift — the whole shadow field slowly travels + breathes. Applied to the wrapping
+   <div> (not the <svg> or the filtered inner <g>): iOS Safari won't animate SMIL filter
+   attrs and is flaky animating CSS transforms on the <svg> node / filtered groups, but a
+   CSS transform on a plain block element composites reliably (and cheaply — the filter
+   output is cached, only the layer moves). Chrome/FF additionally get the feTurbulence
+   morph via SMIL. Edge reveal from the translate is invisible: behind the field is --wall,
+   the same colour as the field rect. NOT gated on reduced-motion — this ambient drift is
+   subtle enough to always run (iOS turns reduced-motion on under Low Power Mode); only the
+   heavier SMIL noise morph is suppressed under reduced-motion (in ShadowField.tsx). */
 .fieldDrift {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   transform-origin: center;
   animation: drift 22s ease-in-out infinite;
   will-change: transform;
@@ -86,9 +90,6 @@
   0%, 100% { transform: translate(0, 0) scale(1.04); }
   33% { transform: translate(-26px, 16px) scale(1.1); }
   66% { transform: translate(18px, -12px) scale(1.06); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fieldDrift { animation: none !important; }
 }
 
 /* --- shared chrome: mode tabs ------------------------------------------------ */

@@ -100,55 +100,59 @@ export default function ShadowField() {
   const blobs = useMemo(() => makeBlobs(w, h), [w, h]);
 
   return (
-    <svg
-      className={`${styles.field} ${reduced ? "" : styles.fieldDrift}`}
-      viewBox={`0 0 ${w} ${h}`}
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <defs>
-        <filter id="cmc-shadow" x="-30%" y="-30%" width="160%" height="160%">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency={SHADOW.freqRest}
-            numOctaves={SHADOW.octaves}
-            seed={SHADOW.seed}
-            result="n"
-          >
-            {/* SMIL can't be paused by CSS, so under reduced-motion we omit it — the
-                noise field then holds a static frame. */}
-            {!reduced && (
-              <animate
-                attributeName="baseFrequency"
-                dur={`${SHADOW.dur}s`}
-                calcMode="spline"
-                keyTimes="0;0.5;1"
-                keySplines="0.45 0 0.55 1;0.45 0 0.55 1"
-                values={`${SHADOW.freqRest};${SHADOW.freqPeak};${SHADOW.freqRest}`}
-                repeatCount="indefinite"
-              />
-            )}
-          </feTurbulence>
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="n"
-            scale={SHADOW.displace}
-            xChannelSelector="R"
-            yChannelSelector="G"
-            result="d"
-          />
-          <feGaussianBlur in="d" stdDeviation={SHADOW.blur} />
-        </filter>
-      </defs>
-      {/* Colours come from the CSS tokens (--wall / --light) via style — SVG
-          presentation attributes don't resolve var(). The ellipses inherit fill from
-          the group. */}
-      <rect width={w} height={h} style={{ fill: "var(--wall)" }} />
-      <g filter="url(#cmc-shadow)" style={{ fill: "var(--light)" }}>
-        {blobs.map((e, i) => (
-          <ellipse key={i} cx={e.cx} cy={e.cy} rx={e.rx} ry={e.ry} opacity={e.o} />
-        ))}
-      </g>
-    </svg>
+    // Drift lives on this wrapping <div>, not the <svg>: iOS Safari animates CSS transforms on a
+    // block element reliably but is flaky on the outer <svg> node. Ungated by reduced-motion (the
+    // subtle ambient drift always runs); only the SMIL noise morph below is gated.
+    <div className={styles.fieldDrift} aria-hidden>
+      <svg
+        className={styles.field}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <filter id="cmc-shadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency={SHADOW.freqRest}
+              numOctaves={SHADOW.octaves}
+              seed={SHADOW.seed}
+              result="n"
+            >
+              {/* SMIL can't be paused by CSS, so under reduced-motion we omit it — the
+                  noise field then holds a static frame. */}
+              {!reduced && (
+                <animate
+                  attributeName="baseFrequency"
+                  dur={`${SHADOW.dur}s`}
+                  calcMode="spline"
+                  keyTimes="0;0.5;1"
+                  keySplines="0.45 0 0.55 1;0.45 0 0.55 1"
+                  values={`${SHADOW.freqRest};${SHADOW.freqPeak};${SHADOW.freqRest}`}
+                  repeatCount="indefinite"
+                />
+              )}
+            </feTurbulence>
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="n"
+              scale={SHADOW.displace}
+              xChannelSelector="R"
+              yChannelSelector="G"
+              result="d"
+            />
+            <feGaussianBlur in="d" stdDeviation={SHADOW.blur} />
+          </filter>
+        </defs>
+        {/* Colours come from the CSS tokens (--wall / --light) via style — SVG
+            presentation attributes don't resolve var(). The ellipses inherit fill from
+            the group. */}
+        <rect width={w} height={h} style={{ fill: "var(--wall)" }} />
+        <g filter="url(#cmc-shadow)" style={{ fill: "var(--light)" }}>
+          {blobs.map((e, i) => (
+            <ellipse key={i} cx={e.cx} cy={e.cy} rx={e.rx} ry={e.ry} opacity={e.o} />
+          ))}
+        </g>
+      </svg>
+    </div>
   );
 }
