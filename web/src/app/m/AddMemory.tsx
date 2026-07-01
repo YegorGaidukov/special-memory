@@ -5,6 +5,7 @@ import { Plus } from "@untitledui/icons";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import DatePicker from "./DatePicker";
 import styles from "./mobile.module.css";
 
 // 5b Add screen: a feathered photo circle + inline serif fields (Name / Date / Narrate),
@@ -16,7 +17,6 @@ type Status = "idle" | "uploading" | "done" | "error";
 
 export default function AddMemory({ onAdded }: { onAdded: () => void }) {
   const photoInput = useRef<HTMLInputElement>(null);
-  const dateInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -88,16 +88,6 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
     );
   }
 
-  const openDate = () => {
-    const el = dateInput.current;
-    if (!el) return;
-    if (typeof el.showPicker === "function") el.showPicker();
-    else el.focus();
-  };
-  const dateLabel = date
-    ? new Date(date).toLocaleDateString(undefined, { month: "long", year: "numeric" })
-    : "Add a date";
-
   const narrateLabel = audio.url
     ? "Voice note added"
     : audio.recording
@@ -118,15 +108,6 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
         className={styles.hiddenInput}
         onChange={(e) => choose(e.target.files)}
       />
-      <input
-        ref={dateInput}
-        type="date"
-        className={styles.hiddenInput}
-        max={new Date().toISOString().slice(0, 10)}
-        value={date}
-        onChange={(e) => setDate(e.target.value)}
-      />
-
       <div className={styles.addContent}>
         <button
           type="button"
@@ -148,18 +129,12 @@ export default function AddMemory({ onAdded }: { onAdded: () => void }) {
         <input
           className={styles.serifField}
           value={name}
-          placeholder="Name this memory"
+          placeholder="Name the Memory"
           onChange={(e) => setName(e.target.value)}
-          aria-label="Name this memory"
+          aria-label="Name the Memory"
         />
 
-        <button
-          type="button"
-          className={`${styles.serifButton} ${date ? styles.serifButtonSet : ""}`}
-          onClick={openDate}
-        >
-          {dateLabel}
-        </button>
+        <DatePicker value={date} onChange={setDate} />
 
         {mounted && audio.supported && (
           <button

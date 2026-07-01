@@ -17,7 +17,7 @@ const SHADOW = {
   seed: 4,
   freqRest: "0.006 0.009", // feTurbulence baseFrequency (px⁻¹): rest / peak of the loop
   freqPeak: "0.0086 0.012",
-  dur: 17, // baseFrequency animation duration (s)
+  dur: 20, // baseFrequency animation duration (s)
   displace: 180, // "spread" — feDisplacementMap scale (px)
   blur: 16, // "softness" — feGaussianBlur stdDeviation (px)
   octaves: 1,
@@ -35,7 +35,7 @@ function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    let t = Math.imul(a ^ (a >>> 16), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };

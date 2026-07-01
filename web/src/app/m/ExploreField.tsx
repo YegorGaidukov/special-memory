@@ -81,7 +81,7 @@ export default function ExploreField({
       onPointerCancel={onPointerUp}
     >
       {records.length === 0 && (
-        <p className={styles.exploreEmpty}>No memories yet — add the first</p>
+        <p className={styles.exploreEmpty}>No memories yet</p>
       )}
       {records.map((rec) => {
         const p = project(rec.transform.position[0], rec.transform.position[2], view);

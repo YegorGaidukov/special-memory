@@ -36,7 +36,7 @@ export default function Library({
       </div>
 
       {records.length === 0 ? (
-        <div className={styles.empty}>No memories yet.</div>
+        <div className={styles.empty}>No memories yet</div>
       ) : (
         <ul className={styles.list}>
           {records.map((r) => (

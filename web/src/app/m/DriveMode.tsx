@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Atom02, Target04 } from "@untitledui/icons";
+import { Signal01 } from "@untitledui/icons";
 import { joystickVector } from "@/lib/control/input";
 import { useControlSocket } from "@/hooks/useControlSocket";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
@@ -32,7 +32,7 @@ export default function DriveMode({
   range: TimeRange | null;
   onRangeChange: (r: TimeRange) => void;
 }) {
-  const { connected, driving, send } = useControlSocket();
+  const { driving, send } = useControlSocket();
   const { status: gyroStatus, enable: enableGyro, disable: disableGyro, read: readAim } =
     useDeviceOrientation();
   const [gyro, setGyro] = useState(false);
@@ -162,11 +162,7 @@ export default function DriveMode({
   );
 
   // Quiet by default (like the mock); only surface the states that need a word.
-  const status = !connected
-    ? "Connecting"
-    : gyroStatus === "denied"
-      ? "Motion denied — use the look pad"
-      : "";
+  const status = gyroStatus === "denied" ? "Motion denied — use the look pad" : "";
 
   const lookDisabled = gyro;
 
@@ -182,25 +178,14 @@ export default function DriveMode({
           aria-pressed={gyro}
           aria-label={gyro ? "Gyro look on — tap to use the look pad" : "Enable gyro look"}
         >
-          <Atom02 width={22} height={22} aria-hidden />
-        </button>
-      )}
-      {gyro && (
-        <button
-          type="button"
-          className={styles.recenterBtn}
-          onClick={() => {
-            pendingRecenter.current = true;
-          }}
-        >
-          <Target04 width={12} height={12} aria-hidden /> Recenter
+          <Signal01 width={30} height={30} aria-hidden />
         </button>
       )}
 
       <div className={styles.pads}>
         <div className={`${styles.pad} ${lookDisabled ? styles.padDisabled : ""}`}>
           <div
-            className={styles.padRing}
+            className={`${styles.padRing} ${lookDisabled ? styles.padRingDashed : ""}`}
             onPointerDown={padDown("look")}
             onPointerMove={padMoveHandler("look")}
             onPointerUp={padUp("look")}
