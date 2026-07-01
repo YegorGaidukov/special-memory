@@ -17,9 +17,7 @@ import Toolbar from "@/components/Toolbar";
 import Library from "@/components/Library";
 import MemoryAudio from "@/components/MemoryAudio";
 import RemoteControlClient from "@/components/RemoteControlClient";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useTheme } from "@/hooks/useTheme";
-import { VolumeMax } from "@untitledui/icons";
 import { applyStoredTransform, type StoredTransform } from "@/lib/transform/apply";
 import { applyEdits } from "@/lib/transform/overlay";
 import { groundMove } from "@/lib/transform/place";
@@ -302,9 +300,11 @@ export default function SplatWorld() {
           <Toolbar
             mapVisible={mapVisible}
             libraryOpen={libraryOpen}
+            soundEnabled={soundEnabled}
             onEdit={() => setEditMode(true)}
             onToggleMap={() => setMapVisible((v) => !v)}
             onToggleLibrary={() => setLibraryOpen((o) => !o)}
+            onToggleSound={() => setSoundEnabled((s) => !s)}
           />
           {libraryOpen && (
             <Library
@@ -318,37 +318,6 @@ export default function SplatWorld() {
           )}
         </>
       )}
-      {!soundEnabled && (
-        <button
-          type="button"
-          onClick={() => setSoundEnabled(true)}
-          title="Enable sound"
-          aria-label="Enable sound"
-          style={{
-            position: "fixed",
-            right: 18,
-            bottom: 16,
-            zIndex: 50,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 34,
-            height: 34,
-            padding: 7,
-            borderRadius: 999,
-            border: "1px solid var(--line-strong)",
-            background: "var(--panel)",
-            WebkitBackdropFilter: "blur(18px) saturate(1.3)",
-            backdropFilter: "blur(18px) saturate(1.3)",
-            boxShadow: "var(--shadow-panel)",
-            color: "var(--ink-dim)",
-            cursor: "pointer",
-          }}
-        >
-          <VolumeMax width="100%" height="100%" aria-hidden />
-        </button>
-      )}
-      <ThemeToggle />
       <RemoteControlClient onJump={handleRemoteJump} onFilter={handleFilter} onPlace={handleRemotePlace} />
     </>
   );
