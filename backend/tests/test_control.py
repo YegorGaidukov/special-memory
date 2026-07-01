@@ -51,6 +51,25 @@ class TestParseControlState:
         assert parse_control_state({"aim": {"yaw": 0, "pitch": 5}})["aim"]["pitch"] == 1.45
         assert parse_control_state({"aim": {"yaw": 0, "pitch": -5}})["aim"]["pitch"] == -1.45
 
+    def test_keeps_valid_filter(self):
+        assert parse_control_state({"filter": {"from": 2012, "to": 2026}})["filter"] == {
+            "from": 2012.0,
+            "to": 2026.0,
+        }
+
+    def test_normalizes_reversed_filter(self):
+        # from/to are normalised so from <= to.
+        assert parse_control_state({"filter": {"from": 2026, "to": 2012}})["filter"] == {
+            "from": 2012.0,
+            "to": 2026.0,
+        }
+
+    def test_drops_invalid_filter(self):
+        assert "filter" not in parse_control_state({"filter": {"from": 2012}})
+        assert "filter" not in parse_control_state({"filter": {"from": float("nan"), "to": 2026}})
+        assert "filter" not in parse_control_state({"filter": "nope"})
+        assert "filter" not in parse_control_state({})
+
     def test_keeps_recenter_flag(self):
         assert parse_control_state({"recenter": True})["recenter"] is True
 

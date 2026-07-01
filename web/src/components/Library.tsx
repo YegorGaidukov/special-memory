@@ -42,7 +42,7 @@ export default function Library({
           {records.map((r) => (
             <li key={r.id}>
               <button type="button" className={styles.row} onClick={() => onTravel(r.id)}>
-                <span className={styles.rowId}>{r.id}</span>
+                <span className={styles.rowId}>{r.name?.trim() || r.id}</span>
                 {r.captured_at && (
                   <span className={styles.rowDate}>
                     {new Date(r.captured_at).toLocaleDateString()}

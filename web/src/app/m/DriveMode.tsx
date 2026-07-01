@@ -1,39 +1,59 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Move, Phone01, Target04 } from "@untitledui/icons";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Atom02, Target04 } from "@untitledui/icons";
 import { joystickVector } from "@/lib/control/input";
 import { useControlSocket } from "@/hooks/useControlSocket";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
+import type { TimeRange } from "@/lib/explore/timeline";
+import type { MemoryRecord } from "@/lib/manifest/types";
+import Timeline from "./Timeline";
 import styles from "./mobile.module.css";
 
-// The phone becomes a joystick for the projected view. Two look modes:
-//   • Gyro ("magic window") — the default: physically aim the phone to look around;
-//     the whole surface is then the move stick. State carries an absolute `aim`.
-//   • Stick (fallback) — left half moves, right half drags to look (rate `look`),
-//     for phones with no sensor or that deny the iOS motion permission.
-// State is sent ~16 Hz; the projector smooths/integrates it. "Jump" flies to a memory.
+// 5b Navigate: the phone drives the projected view. Two explicit circular pads —
+// MOVE (joystick) and LOOK (fallback look stick) — plus a gyro "magic window" toggle
+// and a timeline that filters the city by year. Two look modes:
+//   • Gyro (default when available): aim the phone to look; MOVE still walks. Absolute `aim`.
+//   • Stick: the LOOK pad drives a rate `look`, for phones without/denied motion.
+// State is sent ~16 Hz; the projector smooths it. The timeline broadcasts a `filter`.
 const SEND_MS = 60;
 const MOVE_RADIUS = 70;
-const LOOK_RADIUS = 120;
+const LOOK_RADIUS = 74;
+const THUMB_TRAVEL = 50; // px the thumb dot travels at full deflection
 
-type Track = { id: number; ox: number; oy: number };
+type Pad = { id: number; cx: number; cy: number };
 
-export default function DriveMode() {
+export default function DriveMode({
+  records,
+  range,
+  onRangeChange,
+}: {
+  records: MemoryRecord[];
+  range: TimeRange | null;
+  onRangeChange: (r: TimeRange) => void;
+}) {
   const { connected, driving, send } = useControlSocket();
   const { status: gyroStatus, enable: enableGyro, disable: disableGyro, read: readAim } =
     useDeviceOrientation();
   const [gyro, setGyro] = useState(false);
+  const [thumbMove, setThumbMove] = useState({ x: 0, y: 0 });
+  const [thumbLook, setThumbLook] = useState({ x: 0, y: 0 });
+  // The pads read as empty rings at rest; the thumb only appears while touched.
+  const [moveOn, setMoveOn] = useState(false);
+  const [lookOn, setLookOn] = useState(false);
+
   const move = useRef({ x: 0, y: 0 });
   const look = useRef({ x: 0, y: 0 });
-  const moveTouch = useRef<Track | null>(null);
-  const lookTouch = useRef<Track | null>(null);
-  const active = useRef(false);
+  const moveP = useRef<Pad | null>(null);
+  const lookP = useRef<Pad | null>(null);
+  const requested = useRef(false);
   const pendingRecenter = useRef(false);
 
-  // Push state at a steady rate. In gyro mode we send move + the latest absolute aim
-  // continuously (so you can look without a finger down); in stick mode only while a
-  // finger is held. Recenter rides the first valid aim after a request.
+  const anyPad = () => moveP.current !== null || lookP.current !== null;
+
+  // Steady state push. Gyro: move + latest absolute aim continuously (look without a
+  // finger down); stick: move + look only while a pad is held. Recenter rides the first
+  // valid aim after a request.
   useEffect(() => {
     const t = setInterval(() => {
       if (gyro) {
@@ -47,70 +67,73 @@ export default function DriveMode() {
           }
         }
         send(msg);
-      } else if (active.current) {
+      } else if (anyPad()) {
         send({ type: "state", move: move.current, look: look.current });
       }
     }, SEND_MS);
     return () => clearInterval(t);
   }, [send, gyro, readAim]);
 
-  // Release the driver token when leaving Drive (mode switch unmounts this surface).
+  // Release the driver token when leaving Navigate (mode switch unmounts this surface).
   useEffect(() => {
     return () => send({ type: "release" });
   }, [send]);
 
-  const anyActive = () => moveTouch.current !== null || lookTouch.current !== null;
-
-  const onStart = (e: React.TouchEvent) => {
-    for (const t of Array.from(e.changedTouches)) {
-      if (gyro) {
-        if (!moveTouch.current) moveTouch.current = { id: t.identifier, ox: t.clientX, oy: t.clientY };
-      } else {
-        const leftHalf = t.clientX < window.innerWidth / 2;
-        if (leftHalf && !moveTouch.current) {
-          moveTouch.current = { id: t.identifier, ox: t.clientX, oy: t.clientY };
-        } else if (!lookTouch.current) {
-          lookTouch.current = { id: t.identifier, ox: t.clientX, oy: t.clientY };
-        }
-      }
-    }
-    if (!gyro && anyActive() && !active.current) {
-      active.current = true;
+  const ensureDriving = () => {
+    if (!requested.current) {
+      requested.current = true;
       send({ type: "request" });
     }
   };
-
-  const onMove = (e: React.TouchEvent) => {
-    for (const t of Array.from(e.changedTouches)) {
-      const m = moveTouch.current;
-      const l = lookTouch.current;
-      if (m && t.identifier === m.id) {
-        const v = joystickVector(t.clientX - m.ox, t.clientY - m.oy, MOVE_RADIUS);
-        move.current = { x: v.x, y: -v.y }; // drag up = forward
-      } else if (l && t.identifier === l.id) {
-        const v = joystickVector(t.clientX - l.ox, t.clientY - l.oy, LOOK_RADIUS);
-        look.current = { x: v.x, y: v.y }; // drag down = look down
-      }
-    }
-  };
-
-  const onEnd = (e: React.TouchEvent) => {
-    for (const t of Array.from(e.changedTouches)) {
-      if (moveTouch.current && t.identifier === moveTouch.current.id) {
-        moveTouch.current = null;
-        move.current = { x: 0, y: 0 };
-      }
-      if (lookTouch.current && t.identifier === lookTouch.current.id) {
-        lookTouch.current = null;
-        look.current = { x: 0, y: 0 };
-      }
-    }
-    // In gyro mode the driver is held by the continuous aim stream, not the touch.
-    if (!gyro && !anyActive() && active.current) {
-      active.current = false;
+  const maybeRelease = () => {
+    if (!gyro && !anyPad() && requested.current) {
+      requested.current = false;
       send({ type: "state", move: { x: 0, y: 0 }, look: { x: 0, y: 0 } });
       send({ type: "release" });
     }
+  };
+
+  const padDown = (which: "move" | "look") => (e: React.PointerEvent) => {
+    if (which === "look" && gyro) return; // gyro owns look
+    const r = e.currentTarget.getBoundingClientRect();
+    const pad: Pad = { id: e.pointerId, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (which === "move") {
+      moveP.current = pad;
+      setMoveOn(true);
+    } else {
+      lookP.current = pad;
+      setLookOn(true);
+    }
+    ensureDriving();
+    padMoveHandler(which)(e);
+  };
+  const padMoveHandler = (which: "move" | "look") => (e: React.PointerEvent) => {
+    const p = which === "move" ? moveP.current : lookP.current;
+    if (!p || p.id !== e.pointerId) return;
+    const radius = which === "move" ? MOVE_RADIUS : LOOK_RADIUS;
+    const v = joystickVector(e.clientX - p.cx, e.clientY - p.cy, radius);
+    if (which === "move") {
+      move.current = { x: v.x, y: -v.y }; // up = forward
+      setThumbMove({ x: v.x * THUMB_TRAVEL, y: v.y * THUMB_TRAVEL });
+    } else {
+      look.current = { x: v.x, y: v.y }; // down = look down
+      setThumbLook({ x: v.x * THUMB_TRAVEL, y: v.y * THUMB_TRAVEL });
+    }
+  };
+  const padUp = (which: "move" | "look") => (e: React.PointerEvent) => {
+    if (which === "move" && moveP.current?.id === e.pointerId) {
+      moveP.current = null;
+      move.current = { x: 0, y: 0 };
+      setThumbMove({ x: 0, y: 0 });
+      setMoveOn(false);
+    } else if (which === "look" && lookP.current?.id === e.pointerId) {
+      lookP.current = null;
+      look.current = { x: 0, y: 0 };
+      setThumbLook({ x: 0, y: 0 });
+      setLookOn(false);
+    }
+    maybeRelease();
   };
 
   const toggleGyro = async () => {
@@ -120,78 +143,95 @@ export default function DriveMode() {
       move.current = { x: 0, y: 0 };
       send({ type: "state", move: { x: 0, y: 0 }, look: { x: 0, y: 0 } });
       send({ type: "release" });
+      requested.current = false;
     } else if (await enableGyro()) {
       pendingRecenter.current = true; // baseline "forward" on the first reading
       send({ type: "request" });
+      requested.current = true;
       setGyro(true);
     }
-    // If enable failed, gyroStatus reflects denied/unsupported and we stay on the stick.
   };
 
+  // The timeline sets the shared range AND broadcasts a `filter` to the projector.
+  const applyRange = useCallback(
+    (r: TimeRange) => {
+      onRangeChange(r);
+      send({ type: "state", move: move.current, look: look.current, filter: r });
+    },
+    [onRangeChange, send],
+  );
+
+  // Quiet by default (like the mock); only surface the states that need a word.
   const status = !connected
-    ? "Connecting…"
+    ? "Connecting"
     : gyroStatus === "denied"
-      ? "Motion access denied — using stick"
-      : gyro
-        ? "Aim with your phone"
-        : driving
-          ? "You’re driving"
-          : "Drag to explore";
+      ? "Motion denied — use the look pad"
+      : "";
+
+  const lookDisabled = gyro;
 
   return (
-    <main
-      className={styles.driveSurface}
-      onTouchStart={onStart}
-      onTouchMove={onMove}
-      onTouchEnd={onEnd}
-      onTouchCancel={onEnd}
-    >
-      <div className={styles.driveHints}>
-        {gyro ? (
-          <span>drag anywhere to move</span>
-        ) : (
-          <>
-            <span>move</span>
-            <span>look</span>
-          </>
-        )}
-      </div>
-      <div className={styles.driveHud}>
-        <span className={styles.driveStatus}>{status}</span>
-        <div className={styles.driveActions}>
-          {gyroStatus !== "unsupported" && (
-            <button
-              type="button"
-              className={styles.driveIconBtn}
-              data-active={gyro ? "" : undefined}
-              onClick={toggleGyro}
-            >
-              {gyro ? <Move width={18} height={18} aria-hidden /> : <Phone01 width={18} height={18} aria-hidden />}
-              {gyro ? "Stick" : "Gyro"}
-            </button>
-          )}
-          {gyro && (
-            <button
-              type="button"
-              className={styles.driveIconBtn}
-              onClick={() => {
-                pendingRecenter.current = true;
-              }}
-            >
-              <Target04 width={18} height={18} aria-hidden />
-              Recenter
-            </button>
-          )}
-          <button
-            className={styles.driveBtn}
-            onClick={() =>
-              send({ type: "state", move: move.current, look: look.current, jump: "random" })
-            }
+    <main className={styles.navSurface}>
+      {status && <span className={styles.navStatus}>{status}</span>}
+
+      {gyroStatus !== "unsupported" && (
+        <button
+          type="button"
+          className={`${styles.gyroBtn} ${gyro ? styles.gyroBtnActive : ""}`}
+          onClick={toggleGyro}
+          aria-pressed={gyro}
+          aria-label={gyro ? "Gyro look on — tap to use the look pad" : "Enable gyro look"}
+        >
+          <Atom02 width={22} height={22} aria-hidden />
+        </button>
+      )}
+      {gyro && (
+        <button
+          type="button"
+          className={styles.recenterBtn}
+          onClick={() => {
+            pendingRecenter.current = true;
+          }}
+        >
+          <Target04 width={12} height={12} aria-hidden /> Recenter
+        </button>
+      )}
+
+      <div className={styles.pads}>
+        <div className={`${styles.pad} ${lookDisabled ? styles.padDisabled : ""}`}>
+          <div
+            className={styles.padRing}
+            onPointerDown={padDown("look")}
+            onPointerMove={padMoveHandler("look")}
+            onPointerUp={padUp("look")}
+            onPointerCancel={padUp("look")}
           >
-            Jump to a memory
-          </button>
+            <span
+              className={`${styles.padThumb} ${lookOn ? styles.padThumbOn : ""}`}
+              style={{ transform: `translate(${thumbLook.x}px, ${thumbLook.y}px)` }}
+            />
+          </div>
+          <span className={styles.padLabel}>LOOK</span>
+        </div>
+
+        <div className={styles.pad}>
+          <div
+            className={`${styles.padRing} ${styles.padRingMove}`}
+            onPointerDown={padDown("move")}
+            onPointerMove={padMoveHandler("move")}
+            onPointerUp={padUp("move")}
+            onPointerCancel={padUp("move")}
+          >
+            <span
+              className={`${styles.padThumb} ${moveOn ? styles.padThumbOn : ""}`}
+              style={{ transform: `translate(${thumbMove.x}px, ${thumbMove.y}px)` }}
+            />
+          </div>
+          <span className={styles.padLabel}>MOVE</span>
         </div>
       </div>
+
+      <Timeline records={records} range={range} onChange={applyRange} />
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 
 // Geist is the app typeface (sans for all UI text, mono for numeric readouts).
@@ -7,6 +7,13 @@ import "./globals.css";
 // exposes a CSS variable that globals.css points --font-sans / --font-mono at.
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
+// Newsreader is the serif display face for the phone companion's 5b "Beautiful
+// shadow" screens (memory titles + floating labels). Light weights only.
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  weight: ["300", "400"],
+  variable: "--font-newsreader",
+});
 
 export const metadata: Metadata = {
   title: "Collective Memory City",
@@ -31,7 +38,7 @@ export default function RootLayout({
       lang="en"
       data-theme="dark"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable}`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

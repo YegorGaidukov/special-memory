@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;family=Newsreader:ital,wght@0,300;0,400;1,300;1,400&amp;display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#eceae4;font-family:"Geist",system-ui,sans-serif}
+  .dv-turn{padding:44px 48px 40px;border-bottom:1px solid rgba(0,0,0,.08)}
+  .dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 26px}
+  .dv-tid{font:600 10px "Geist Mono",monospace;padding:3px 7px;background:#15171c;color:#fff;border-radius:4px;text-decoration:none}
+  .dv-tname{font:600 13px/1.2 "Geist",sans-serif;color:#15171c}
+  .dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+  .dv-opt{flex:none;display:flex;flex-direction:column;gap:14px;scroll-margin-top:16px}
+  .dv-oid{font:600 10.5px "Geist Mono",monospace;padding:3px 7px;background:rgba(0,0,0,.07);color:#15171c;border-radius:5px;text-decoration:none}
+  .dv-olabel{display:flex;align-items:center;gap:9px;font:400 12px/1.35 "Geist",sans-serif;color:rgba(0,0,0,.55);max-width:660px}
+  .dv-opt:target .dv-oid{background:#5b78e6;color:#fff}
+  .dv-pair{display:flex;flex-wrap:wrap;gap:18px}
+  .dv-cap{font:500 10px "Geist Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:rgba(0,0,0,.38);margin:10px 2px 0}
+  .phe{position:relative;width:min(82vw,288px);aspect-ratio:288/600;border-radius:14cqmin;background:#efe7d8;border:1px solid rgba(0,0,0,.06);box-shadow:0 34px 70px -28px rgba(40,30,15,.32),inset 0 1px 0 rgba(255,255,255,.6);overflow:hidden;container-type:size;display:flex;flex-direction:column}
+  .emono{font-family:"Geist Mono",monospace;text-transform:uppercase;letter-spacing:.16em;color:#211d18}
+  /* Fluid single-warm rehaul */
+  .grainf{position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='140'%20height='140'%3E%3Cfilter%20id='gf'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.8'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23gf)'/%3E%3C/svg%3E");mix-blend-mode:overlay;opacity:.13;pointer-events:none}
+  .serif{font-family:"Newsreader",Georgia,serif;font-weight:300;color:#33230f}
+  .underln{border-bottom:1px solid rgba(51,35,15,.32);padding-bottom:5px}
+  @keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(18px,-14px) scale(1.06)}66%{transform:translate(-10px,8px) scale(1.03)}}
+  @keyframes drift2{0%,100%{transform:translate(0,0) scale(1.02)}33%{transform:translate(-20px,11px) scale(1.08)}66%{transform:translate(12px,-9px) scale(1.04)}}
+  @keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(16px,15px) scale(1.07)}66%{transform:translate(-12px,-8px) scale(1.03)}}
+  @keyframes drift4{0%,100%{transform:translate(0,0) scale(1.01)}33%{transform:translate(-16px,-15px) scale(1.06)}66%{transform:translate(11px,10px) scale(1.03)}}
+  @media (prefers-reduced-motion:reduce){[style*="animation:drift"]{animation:none!important}}
+  /* Responsive 5b — adaptive reflow: container-query units + flex, no magic px */
+  .mc-tabs{position:relative;z-index:2;flex:none;display:flex;justify-content:center;gap:6cqw;padding-top:max(3cqh,env(safe-area-inset-top))}
+  .mc-tab{font-family:"Geist Mono",monospace;text-transform:uppercase;letter-spacing:.16em;font-size:clamp(10px,3.8cqw,12px);font-weight:500;color:rgba(33,29,24,.4)}
+  .mc-tab--on{font-weight:600;color:#211d18}
+  .mc-stage{position:relative;z-index:2;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 8cqw max(5cqh,env(safe-area-inset-bottom))}
+  .mc-stage--add{justify-content:flex-start;padding-top:clamp(24px,8cqh,56px)}
+  .mc-add-main{display:flex;flex-direction:column;align-items:center;gap:clamp(8px,2.2cqh,14px)}
+  .mc-photo{position:relative;width:clamp(76px,30cqw,104px);aspect-ratio:1;margin-bottom:1.5cqh;cursor:pointer}
+  .mc-photo-fill{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(circle,#000 55%,transparent 100%);mask:radial-gradient(circle,#000 55%,transparent 100%);background-color:#33230F1A}
+  .mc-photo-plus{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30%;height:auto;opacity:.6}
+  .mc-field{margin:0;font-family:"Newsreader",Georgia,serif;font-weight:300;font-size:clamp(20px,8.3cqw,26px);line-height:1.1;color:#33230f}
+  .mc-field--muted{color:rgba(51,35,15,.42)}
+  .mc-action{font-family:"Geist Mono",monospace;text-transform:uppercase;letter-spacing:.16em;font-size:clamp(10px,3.8cqw,12px);font-weight:600;margin-top:clamp(16px,4.4cqh,30px);color:#211d18}
+  .mc-foot{margin-top:auto;font-family:"Geist Mono",monospace;text-transform:uppercase;letter-spacing:.16em;font-size:clamp(8px,3.1cqw,10px);font-weight:400;color:rgba(51,35,15,.45)}
+  .mc-added{display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2.6cqh,18px)}
+  .mc-added-sub{margin:0;font-family:"Geist Mono",monospace;text-transform:uppercase;font-size:clamp(8px,2.9cqw,10px);font-weight:400;letter-spacing:.14em;line-height:1.7;color:rgba(51,35,15,.55)}
+  .mc-explore{position:absolute;inset:0;z-index:2}
+  .mc-label{position:absolute;font-family:"Newsreader",Georgia,serif;font-weight:300;font-size:clamp(14px,5.9cqw,18px);line-height:1.2;color:#33230f}
+  .mc-gyro{position:absolute;top:max(7cqh,env(safe-area-inset-top));right:8cqw;z-index:3;width:clamp(28px,10cqw,34px);aspect-ratio:1;border-radius:50%;border:1px solid rgba(51,35,15,.28);background:none;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;backdrop-filter:blur(4px)}
+  .mc-nav{position:relative;z-index:2;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(18px,5cqh,32px)}
+  .mc-pad-wrap{display:flex;flex-direction:column;align-items:center;gap:clamp(6px,1.6cqh,12px)}
+  .mc-pad{width:clamp(120px,50cqw,168px);aspect-ratio:1;border-radius:50%;border:2px solid rgba(51,35,15,.24)}
+  .mc-pad--move{border-color:rgba(51,35,15,.26)}
+  .mc-pad-label{font-family:"Geist Mono",monospace;font-weight:600;font-size:clamp(7px,2.8cqw,9px);letter-spacing:.22em;color:rgba(51,35,15,.5)}
+  .mc-timeline{position:relative;z-index:2;flex:none;height:clamp(48px,10cqh,64px);margin:0 8cqw max(5cqh,env(safe-area-inset-bottom))}
+  .mc-tl-line{position:absolute;top:50%;left:0;right:0;height:3px;background-color:#33230F;-webkit-mask:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent);mask:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent)}
+  .mc-tl-dot{position:absolute;top:50%;width:8px;height:8px;border-radius:50%;background-color:#33230F;transform:translateY(-50%)}
+  .mc-tl-year{position:absolute;top:0;font-family:"Geist Mono",monospace;font-weight:600;font-size:clamp(7px,2.8cqw,9px);letter-spacing:.2em;color:rgba(51,35,15,.55)}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t5">
+  <div class="dv-thd"><a class="dv-tid" href="#t5">5</a><span class="dv-tname">Fluid · single field, no boxes · warm vs. shadow</span></div>
+  <div class="dv-opts">
+
+
+
+    <div class="dv-opt" id="5b">
+      <div class="dv-olabel"><a class="dv-oid" href="#5b">5b</a><span><b>Beautiful shadow.</b> Dappled foliage shadow — scattered soft blobs of shade rather than a smooth pool — on a warm lilac/blue wall. Reads as light falling through leaves.</span></div>
+      <div class="dv-pair">
+
+        <!-- 1 · ADD -->
+        <div class="phe" style="background:#ebe9f1">
+          <svg width="100%" height="100%" viewBox="0 0 288 600" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0">
+            <defs>
+              <filter id="flb1" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency="0.006 0.009" numOctaves="2" seed="4" result="n"><animate attributeName="baseFrequency" dur="17s" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" values="0.006 0.009;0.0086 0.012;0.006 0.009" repeatCount="indefinite"></animate></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="185" xChannelSelector="R" yChannelSelector="G" result="d"></feDisplacementMap><feGaussianBlur in="d" stdDeviation="17"></feGaussianBlur></filter>
+            </defs>
+            <rect width="288" height="600" fill="#ebe9f1"></rect>
+            <g filter="url(#flb1)" style="transform-box:fill-box;transform-origin:center;animation:drift2 27s ease-in-out infinite"><ellipse cx="60" cy="90" rx="70" ry="60" fill="#b1afbb" opacity="0.55"></ellipse><ellipse cx="215" cy="70" rx="82" ry="70" fill="#aba9b6" opacity="0.5"></ellipse><ellipse cx="150" cy="215" rx="95" ry="82" fill="#bcbac4" opacity="0.45"></ellipse><ellipse cx="38" cy="330" rx="78" ry="92" fill="#adabb8" opacity="0.5"></ellipse><ellipse cx="252" cy="360" rx="86" ry="80" fill="#b4b2be" opacity="0.5"></ellipse><ellipse cx="120" cy="475" rx="100" ry="92" fill="#a9a7b4" opacity="0.55"></ellipse><ellipse cx="242" cy="565" rx="92" ry="86" fill="#b9b7c1" opacity="0.5"></ellipse><ellipse cx="58" cy="585" rx="82" ry="80" fill="#b1afbb" opacity="0.5"></ellipse></g>
+          </svg>
+          <div class="grainf"></div>
+          <div class="mc-tabs"><span class="mc-tab mc-tab--on">Add</span><span class="mc-tab">Navigate</span><span class="mc-tab">Explore</span></div>
+          <div class="mc-stage mc-stage--add">
+            <div class="mc-add-main">
+              <div class="mc-photo">
+                <div class="mc-photo-fill"></div>
+                <svg class="mc-photo-plus" viewBox="0 0 24 24" fill="none" stroke="#33230f" stroke-width="1.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+              </div>
+              <h1 class="mc-field">Name this memory</h1>
+              <span class="mc-field mc-field--muted">Add a date</span>
+              <span class="mc-field mc-field--muted">Narrate</span>
+              <span class="mc-action">ADD TO THE CITY</span>
+            </div>
+            <span class="mc-foot">Choose another photo</span>
+          </div>
+        </div>
+
+        <!-- 2 · ADDED -->
+        <div class="phe" style="background:#ebe9f1">
+          <svg width="100%" height="100%" viewBox="0 0 288 600" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0">
+            <defs>
+              <filter id="flb2" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency="0.0055" numOctaves="2" seed="21" result="n"><animate attributeName="baseFrequency" dur="19s" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" values="0.0055;0.0078;0.0055" repeatCount="indefinite"></animate></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="185" xChannelSelector="R" yChannelSelector="G" result="d"></feDisplacementMap><feGaussianBlur in="d" stdDeviation="17"></feGaussianBlur></filter>
+            </defs>
+            <rect width="288" height="600" fill="#ebe9f1"></rect>
+            <g filter="url(#flb2)" style="transform-box:fill-box;transform-origin:center;animation:drift3 21s ease-in-out infinite"><ellipse cx="70" cy="80" rx="78" ry="66" fill="#b1afbb" opacity="0.5"></ellipse><ellipse cx="225" cy="140" rx="88" ry="78" fill="#a9a7b4" opacity="0.5"></ellipse><ellipse cx="110" cy="250" rx="92" ry="84" fill="#b9b7c1" opacity="0.45"></ellipse><ellipse cx="250" cy="330" rx="80" ry="88" fill="#adabb8" opacity="0.5"></ellipse><ellipse cx="45" cy="400" rx="84" ry="90" fill="#b4b2be" opacity="0.5"></ellipse><ellipse cx="160" cy="500" rx="104" ry="92" fill="#aba9b6" opacity="0.52"></ellipse><ellipse cx="60" cy="570" rx="86" ry="82" fill="#bcbac4" opacity="0.48"></ellipse><ellipse cx="245" cy="575" rx="88" ry="84" fill="#b1afbb" opacity="0.5"></ellipse></g>
+          </svg>
+          <div class="grainf"></div>
+          <div class="mc-tabs"><span class="mc-tab mc-tab--on">Add</span><span class="mc-tab">Navigate</span><span class="mc-tab">Explore</span></div>
+          <div class="mc-stage">
+            <div class="mc-added">
+              <h1 class="mc-field">Memory added</h1>
+              <p class="mc-added-sub">It’s finding its place<br>in the city</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 · EXPLORE -->
+        <div class="phe" style="background:#ebe9f1">
+          <svg width="100%" height="100%" viewBox="0 0 288 600" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0">
+            <defs>
+              <filter id="flb3" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency="0.006 0.0075" numOctaves="2" seed="33" result="n"><animate attributeName="baseFrequency" dur="16s" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" values="0.006 0.0075;0.0083 0.01;0.006 0.0075" repeatCount="indefinite"></animate></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="185" xChannelSelector="R" yChannelSelector="G" result="d"></feDisplacementMap><feGaussianBlur in="d" stdDeviation="17"></feGaussianBlur></filter>
+            </defs>
+            <rect width="288" height="600" fill="#ebe9f1"></rect>
+            <g filter="url(#flb3)" style="transform-box:fill-box;transform-origin:center;animation:drift4 25s ease-in-out infinite"><ellipse cx="210" cy="90" rx="92" ry="84" fill="#aba9b6" opacity="0.52"></ellipse><ellipse cx="55" cy="140" rx="80" ry="72" fill="#bcbac4" opacity="0.46"></ellipse><ellipse cx="150" cy="270" rx="96" ry="88" fill="#adabb8" opacity="0.5"></ellipse><ellipse cx="250" cy="330" rx="84" ry="80" fill="#b4b2be" opacity="0.5"></ellipse><ellipse cx="40" cy="390" rx="82" ry="90" fill="#b1afbb" opacity="0.5"></ellipse><ellipse cx="200" cy="470" rx="98" ry="90" fill="#a9a7b4" opacity="0.54"></ellipse><ellipse cx="80" cy="540" rx="88" ry="84" fill="#b9b7c1" opacity="0.48"></ellipse><ellipse cx="240" cy="575" rx="86" ry="82" fill="#b1afbb" opacity="0.5"></ellipse></g>
+          </svg>
+          <div class="grainf"></div>
+          <div class="mc-tabs"><span class="mc-tab">Add</span><span class="mc-tab">Navigate</span><span class="mc-tab mc-tab--on">Explore</span></div>
+          <div class="mc-explore">
+            <span class="mc-label" style="top:19%;left:52%">The Pier</span>
+            <span class="mc-label" style="top:35%;left:14%;width:30%">First snow</span>
+            <span class="mc-label" style="top:50%;left:46%">Chrismas</span>
+            <span class="mc-label" style="top:62%;left:22%">Grandmas Home</span>
+            <span class="mc-label" style="top:76%;left:54%">Kneipe</span>
+          </div>
+        </div>
+
+        <!-- 4 · NAVIGATE -->
+        <div class="phe" style="background:#ebe9f1">
+          <svg width="100%" height="100%" viewBox="0 0 288 600" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0">
+            <defs>
+              <filter id="flb5" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency="0.0065" numOctaves="2" seed="48" result="n"><animate attributeName="baseFrequency" dur="18s" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" values="0.0065;0.0089;0.0065" repeatCount="indefinite"></animate></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="185" xChannelSelector="R" yChannelSelector="G" result="d"></feDisplacementMap><feGaussianBlur in="d" stdDeviation="17"></feGaussianBlur></filter>
+            </defs>
+            <rect width="288" height="600" fill="#ebe9f1"></rect>
+            <g filter="url(#flb5)" style="transform-box:fill-box;transform-origin:center;animation:drift3 23s ease-in-out infinite"><ellipse cx="65" cy="85" rx="76" ry="66" fill="#b1afbb" opacity="0.52"></ellipse><ellipse cx="220" cy="110" rx="84" ry="76" fill="#a9a7b4" opacity="0.5"></ellipse><ellipse cx="140" cy="230" rx="94" ry="86" fill="#bcbac4" opacity="0.45"></ellipse><ellipse cx="250" cy="340" rx="82" ry="84" fill="#adabb8" opacity="0.5"></ellipse><ellipse cx="42" cy="370" rx="84" ry="92" fill="#b4b2be" opacity="0.5"></ellipse><ellipse cx="150" cy="490" rx="102" ry="92" fill="#aba9b6" opacity="0.52"></ellipse><ellipse cx="245" cy="565" rx="88" ry="84" fill="#b9b7c1" opacity="0.48"></ellipse><ellipse cx="58" cy="580" rx="84" ry="80" fill="#b1afbb" opacity="0.5"></ellipse></g>
+          </svg>
+          <div class="grainf"></div>
+          <div class="mc-tabs"><span class="mc-tab">Add</span><span class="mc-tab mc-tab--on">Navigate</span><span class="mc-tab">Explore</span></div>
+          <button class="mc-gyro" title="Gyro look">
+            <svg width="55%" height="55%" viewBox="0 0 24 24" fill="none" stroke="#33230f" stroke-width="1.4"><circle cx="12" cy="12" r="3.4"></circle><ellipse cx="12" cy="12" rx="9.5" ry="4"></ellipse><ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(60 12 12)"></ellipse><ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(120 12 12)"></ellipse></svg>
+          </button>
+          <div class="mc-nav">
+            <div class="mc-pad-wrap">
+              <div class="mc-pad mc-pad--look"></div>
+              <span class="mc-pad-label">LOOK</span>
+            </div>
+            <div class="mc-pad-wrap">
+              <div class="mc-pad mc-pad--move"></div>
+              <span class="mc-pad-label" style="color:rgba(51,35,15,.55)">MOVE</span>
+            </div>
+          </div>
+          <div class="mc-timeline">
+            <span class="mc-tl-year" style="left:10%">2012</span>
+            <span class="mc-tl-year" style="right:10%">2026</span>
+            <div class="mc-tl-line"></div>
+            <span class="mc-tl-dot" style="left:20%"></span>
+            <span class="mc-tl-dot" style="left:44%"></span>
+            <span class="mc-tl-dot" style="left:68%"></span>
+            <span class="mc-tl-dot" style="left:82%"></span>
+          </div>
+        </div>
+
+      </div>
+      <div class="dv-cap">Add · Added · Explore · Navigate · lilac shadow</div>
+    </div>
+</section>
+
+<script type="text/x-dc" data-dc-script data-props="{&quot;wallColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#b7b9c4&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Shadow (5b)&quot;,&quot;options&quot;:[&quot;#c3c5d0&quot;,&quot;#bcc0cf&quot;,&quot;#c6c2cf&quot;,&quot;#bcc6c2&quot;,&quot;#cdc3c6&quot;,&quot;#b7b9c4&quot;,&quot;#a7abbd&quot;,&quot;#9fa6b8&quot;,&quot;#b6b1a4&quot;,&quot;#a9b3ad&quot;,&quot;#c9bcae&quot;,&quot;#b0aab6&quot;]},&quot;lightColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#fbf6ea&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Shadow (5b)&quot;,&quot;options&quot;:[&quot;#f4f3f8&quot;,&quot;#ffffff&quot;,&quot;#f6f2ec&quot;,&quot;#eef3f7&quot;,&quot;#fbf6ea&quot;,&quot;#fdeede&quot;,&quot;#eaf3ee&quot;,&quot;#f3ecf5&quot;,&quot;#fff3e6&quot;,&quot;#e9eef4&quot;]},&quot;shadowOpacity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1.8,&quot;min&quot;:0.3,&quot;max&quot;:1.8,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Shadow (5b)&quot;,&quot;unit&quot;:&quot;×&quot;},&quot;shadowSoftness&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:12,&quot;min&quot;:4,&quot;max&quot;:40,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Shadow (5b)&quot;,&quot;unit&quot;:&quot;px&quot;},&quot;shadowSpread&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:180,&quot;min&quot;:60,&quot;max&quot;:260,&quot;step&quot;:5,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Shadow (5b)&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { this._saveBase(); this._apply(); }
+  componentDidUpdate() { this._apply(); }
+  _saveBase() {
+    const r = document.getElementById('5b'); if (!r) return;
+    r.querySelectorAll('g[style] ellipse').forEach(e => {
+      if (!e.dataset.baseO) e.dataset.baseO = e.getAttribute('opacity') || '0.5';
+    });
+  }
+  _apply() {
+    const r = document.getElementById('5b'); if (!r) return;
+    const p = this.props || {};
+    const light   = p.lightColor      ?? '#f4f3f8';
+    const wall    = p.wallColor       ?? '#c3c5d0';
+    const mult    = p.shadowOpacity   ?? 1;
+    const blur    = p.shadowSoftness  ?? 17;
+    const spread  = p.shadowSpread    ?? 185;
+    r.querySelectorAll('g[style] ellipse').forEach(e => {
+      e.setAttribute('fill', light);
+      const b = parseFloat(e.dataset.baseO || '0.5');
+      e.setAttribute('opacity', Math.min(1, b * mult).toFixed(3));
+    });
+    r.querySelectorAll('rect').forEach(e => e.setAttribute('fill', wall));
+    r.querySelectorAll('.phe').forEach(e => { e.style.background = wall; });
+    r.querySelectorAll('feGaussianBlur').forEach(e => e.setAttribute('stdDeviation', blur));
+    r.querySelectorAll('feDisplacementMap').forEach(e => e.setAttribute('scale', spread));
+  }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

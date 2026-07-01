@@ -67,6 +67,7 @@ function parseMemory(v: unknown, idx: number): MemoryRecord {
     splat_url: asString(v.splat_url, `${ctx}.splat_url`),
     transform: parseTransform(v.transform, `${ctx}.transform`),
   };
+  if (v.name != null) record.name = asString(v.name, `${ctx}.name`);
   if (v.captured_at != null) record.captured_at = asString(v.captured_at, `${ctx}.captured_at`);
   if (v.geo != null) record.geo = parseGeo(v.geo, `${ctx}.geo`);
   if (v.heading_deg != null) record.heading_deg = asNumber(v.heading_deg, `${ctx}.heading_deg`);

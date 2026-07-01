@@ -103,6 +103,40 @@ def test_post_with_audio_saves_and_sets_url(client):
     assert (public / f"{rec['id']}.webm").read_bytes() == b"OpusOpus"
 
 
+def test_post_with_name_persists(client):
+    c, _ = client
+    rec = c.post(
+        "/api/memories",
+        data={"name": "  The Pier  "},
+        files={"photo": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")},
+    ).json()["record"]
+    assert rec["name"] == "The Pier"  # trimmed
+
+
+def test_post_without_name_omits_field(client):
+    c, _ = client
+    rec = c.post(
+        "/api/memories",
+        data={"name": "   "},
+        files={"photo": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")},
+    ).json()["record"]
+    assert "name" not in rec
+
+
+def test_name_round_trips_through_publish(client):
+    c, public = client
+    rec = c.post(
+        "/api/memories",
+        data={"name": "First snow"},
+        files={"photo": ("a.jpg", b"\xff\xd8\xff", "image/jpeg")},
+    ).json()["record"]
+    (public / f"{rec['id']}.sog").write_bytes(b"sog")
+    c.post(f"/api/memories/{rec['id']}/ingest")
+    manifest = json.loads((public / "manifest.json").read_text())
+    mem = next(m for m in manifest["memories"] if m["id"] == rec["id"])
+    assert mem["name"] == "First snow"
+
+
 def test_post_with_manual_date(client):
     c, _ = client
     r = c.post(

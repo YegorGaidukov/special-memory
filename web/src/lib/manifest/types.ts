@@ -32,6 +32,8 @@ export interface MemoryRecord {
   thumbnail_url: string;
   splat_url: string;
   transform: Transform;
+  /** Human-given title for the memory (S5b). Shown as the label in Explore/Library. */
+  name?: string;
   captured_at?: string;
   geo?: Geo;
   heading_deg?: number;

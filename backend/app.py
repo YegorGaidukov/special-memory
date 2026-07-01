@@ -104,6 +104,7 @@ async def create_memory(
     camera_forward: Optional[str] = Form(None),
     placement_mode: Optional[str] = Form(None, alias="placement"),
     captured_at: Optional[str] = Form(None),
+    name: Optional[str] = Form(None),
     audio: Optional[UploadFile] = None,
 ):
     data = await photo.read()
@@ -163,6 +164,8 @@ async def create_memory(
         "captured_at": when,
         "created_at": _now_iso(),
     }
+    if name and name.strip():
+        record["name"] = name.strip()
     if audio_url:
         record["audio_url"] = audio_url
     services.add_record_locked(record)
@@ -312,6 +315,10 @@ async def control_ws(ws: WebSocket):
                         await _broadcast({"type": "jump", "target": parsed["jump"]})
                     if "recenter" in parsed:
                         await _broadcast({"type": "recenter"})
+                    if "filter" in parsed:
+                        await _broadcast(
+                            {"type": "filter", "from": parsed["filter"]["from"], "to": parsed["filter"]["to"]}
+                        )
     except WebSocketDisconnect:
         pass
     finally:

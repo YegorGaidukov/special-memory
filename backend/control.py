@@ -53,13 +53,26 @@ def _parse_aim(raw):
     return {"yaw": _wrap_pi(float(raw["yaw"])), "pitch": pitch}
 
 
+def _parse_filter(raw):
+    """Validate a timeline year-range ``{from, to}`` (numbers). Both bounds must be
+    finite or the whole filter is dropped. Reversed bounds are normalised so
+    ``from <= to``. Broadcast to the projector to show/hide memories by capture year."""
+    if not isinstance(raw, dict) or not _finite(raw.get("from")) or not _finite(raw.get("to")):
+        return None
+    lo, hi = float(raw["from"]), float(raw["to"])
+    if lo > hi:
+        lo, hi = hi, lo
+    return {"from": lo, "to": hi}
+
+
 def parse_control_state(raw) -> dict:
-    """Validate an untrusted control message into ``{move, look, aim?, jump?, recenter?}``.
+    """Validate an untrusted control message into ``{move, look, aim?, jump?, recenter?, filter?}``.
 
     move/look axes are clamped to [-1, 1] (missing -> 0). ``aim`` (absolute orientation)
     is kept only when both axes are finite. ``jump`` is kept only when it's a non-empty
-    string (``"random"`` or a memory id). ``recenter`` is kept only when truthy. Each
-    optional field is omitted when absent/invalid.
+    string (``"random"`` or a memory id). ``recenter`` is kept only when truthy. ``filter``
+    (a timeline year-range) is kept only when both bounds are finite. Each optional field
+    is omitted when absent/invalid.
     """
     if not isinstance(raw, dict):
         return _zero_state()
@@ -72,6 +85,9 @@ def parse_control_state(raw) -> dict:
         state["jump"] = jump.strip()
     if raw.get("recenter") is True:
         state["recenter"] = True
+    filt = _parse_filter(raw.get("filter"))
+    if filt is not None:
+        state["filter"] = filt
     return state
 
 

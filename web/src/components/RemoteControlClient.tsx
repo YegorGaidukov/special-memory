@@ -10,8 +10,11 @@ import { setRemoteControl, resetRemoteControl, bumpRecenter } from "@/lib/contro
 // if the socket drops. DOM-side (no Canvas); mounted once on the explorer.
 export default function RemoteControlClient({
   onJump,
+  onFilter,
 }: {
   onJump: (target: string) => void;
+  /** A timeline year-range from the phone: show only memories captured within it. */
+  onFilter?: (from: number, to: number) => void;
 }) {
   useEffect(() => {
     let closed = false;
@@ -35,6 +38,12 @@ export default function RemoteControlClient({
             onJump(msg.target);
           } else if (msg.type === "recenter") {
             bumpRecenter();
+          } else if (
+            msg.type === "filter" &&
+            typeof msg.from === "number" &&
+            typeof msg.to === "number"
+          ) {
+            onFilter?.(msg.from, msg.to);
           }
         } catch {
           /* ignore malformed frames */
@@ -54,7 +63,7 @@ export default function RemoteControlClient({
       resetRemoteControl();
       ws?.close();
     };
-  }, [onJump]);
+  }, [onJump, onFilter]);
 
   return null;
 }

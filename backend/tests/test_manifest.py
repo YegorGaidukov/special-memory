@@ -145,3 +145,10 @@ class TestParseManifest:
             {"id": "b", "status": "uploaded", "thumbnail_url": "", "splat_url": "", "transform": {"position": [0, 0, 0], "quaternion": [0, 0, 0, 1], "scale": 1}},
         ]}
         assert [x["id"] for x in parse_manifest(m)["memories"]] == ["a"]
+
+    def test_parses_optional_name(self):
+        m = {"city": CITY, "memories": [
+            {"id": "a", "status": "approved", "thumbnail_url": "", "splat_url": "a.sog", "name": "The Pier",
+             "transform": {"position": [0, 0, 0], "quaternion": [0, 0, 0, 1], "scale": 1}},
+        ]}
+        assert parse_manifest(m)["memories"][0]["name"] == "The Pier"

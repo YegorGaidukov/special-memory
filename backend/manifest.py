@@ -69,6 +69,8 @@ def _parse_memory(v, idx: int) -> dict:
         "splat_url": _as_string(v.get("splat_url"), f"{ctx}.splat_url"),
         "transform": _parse_transform(v.get("transform"), f"{ctx}.transform"),
     }
+    if v.get("name") is not None:
+        record["name"] = _as_string(v.get("name"), f"{ctx}.name")
     if v.get("captured_at") is not None:
         record["captured_at"] = _as_string(v.get("captured_at"), f"{ctx}.captured_at")
     if v.get("geo") is not None:

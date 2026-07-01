@@ -34,6 +34,16 @@ describe("parseManifest", () => {
     expect(m.memories[0].transform.quaternion).toEqual([0, 0, 0, 1]);
   });
 
+  it("parses the optional name when present", () => {
+    const raw = validRaw();
+    (raw.memories[0] as Record<string, unknown>).name = "The Pier";
+    expect(parseManifest(raw).memories[0].name).toBe("The Pier");
+  });
+
+  it("leaves name undefined when absent", () => {
+    expect(parseManifest(validRaw()).memories[0].name).toBeUndefined();
+  });
+
   it("throws when a memory is missing its transform", () => {
     const raw = validRaw();
     delete (raw.memories[0] as Record<string, unknown>).transform;

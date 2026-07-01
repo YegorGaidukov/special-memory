@@ -25,6 +25,7 @@ import { applyEdits } from "@/lib/transform/overlay";
 import { MAP } from "@/config/explorer";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import { getResident } from "@/lib/splat/registry";
+import { isVisibleInRange, type TimeRange } from "@/lib/explore/timeline";
 import type { MemoryRecord } from "@/lib/manifest/types";
 
 // Stable empty list so the nav/travel effects don't re-bind before the manifest loads.
@@ -77,6 +78,18 @@ export default function SplatWorld() {
   // (and on disk after save). Empty in the public fly-through → no-op identity.
   const [edits, setEdits] = useState<Record<string, StoredTransform>>({});
   const records = useMemo(() => applyEdits(baseRecords, edits), [baseRecords, edits]);
+
+  // Phone timeline filter: the projected city shows only memories captured within the
+  // active year window (undated memories always stay). Null = no filter (show all).
+  // Only the rendered/audible city is filtered — Library/Travel keep the full set.
+  const [filterRange, setFilterRange] = useState<TimeRange | null>(null);
+  const handleFilter = useCallback((from: number, to: number) => {
+    setFilterRange({ from, to });
+  }, []);
+  const visibleRecords = useMemo(
+    () => (filterRange ? records.filter((r) => isVisibleInRange(r, filterRange)) : records),
+    [records, filterRange],
+  );
 
   // Latest records read by the (stable) remote-jump handler without reconnecting the
   // control socket each time records change.
@@ -236,11 +249,13 @@ export default function SplatWorld() {
         <MapGround visible={mapVisible} />
         {m.status === "ready" && (
           <Memories
-            records={records}
+            records={editMode ? records : visibleRecords}
             forceResidentId={editMode ? selectedId : null}
           />
         )}
-        {m.status === "ready" && <MemoryAudio records={records} enabled={soundEnabled} />}
+        {m.status === "ready" && (
+          <MemoryAudio records={editMode ? records : visibleRecords} enabled={soundEnabled} />
+        )}
         <PendingSpheres records={pending} />
         <Navigation />
         {editMode ? (
@@ -323,7 +338,7 @@ export default function SplatWorld() {
         </button>
       )}
       <ThemeToggle />
-      <RemoteControlClient onJump={handleRemoteJump} />
+      <RemoteControlClient onJump={handleRemoteJump} onFilter={handleFilter} />
     </>
   );
 }

@@ -1,25 +1,34 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { Check, Microphone01, Plus, Recording01 } from "@untitledui/icons";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus } from "@untitledui/icons";
 import { pickImage } from "@/lib/upload/pickImage";
 import { getApiBaseUrl } from "@/lib/api/baseUrl";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import styles from "./mobile.module.css";
 
-// The phone contribution: pick a photo, optionally set the date (auto-filled from
-// EXIF server-side; this is the manual fallback) and record a short voice note. The
-// memory scatters near the existing cluster (placement=scatter) — no GPS, no camera.
-type Status = "idle" | "selected" | "uploading" | "done" | "error";
+// 5b Add screen: a feathered photo circle + inline serif fields (Name / Date / Narrate),
+// all floating on the shadow field — no boxes. Tap the circle to choose a photo; name
+// it, optionally date it (manual fallback for missing EXIF) and record a voice note;
+// then ADD TO THE CITY uploads (placement=scatter, near the cluster). On success the
+// transient "Memory added" state auto-advances to Explore.
+type Status = "idle" | "uploading" | "done" | "error";
 
-export default function AddMemory({ onExplore }: { onExplore: () => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+export default function AddMemory({ onAdded }: { onAdded: () => void }) {
+  const photoInput = useRef<HTMLInputElement>(null);
+  const dateInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [name, setName] = useState("");
   const [date, setDate] = useState("");
   const audio = useAudioRecorder();
+  // `audio.supported` reads client-only globals (navigator/MediaRecorder), so it's
+  // false during SSR and true after hydration — gating the Narrate button on it
+  // directly would mismatch the server HTML. Defer it until mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const choose = useCallback((files: FileList | null) => {
     if (!files) return;
@@ -35,7 +44,7 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
       return URL.createObjectURL(picked.file);
     });
     setError(null);
-    setStatus("selected");
+    setStatus("idle");
   }, []);
 
   const upload = useCallback(async () => {
@@ -46,6 +55,7 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
       const form = new FormData();
       form.append("photo", file);
       form.append("placement", "scatter");
+      if (name.trim()) form.append("name", name.trim());
       if (date) form.append("captured_at", date);
       if (audio.blob) form.append("audio", audio.blob, "note");
       const r = await fetch(`${getApiBaseUrl()}/api/memories`, { method: "POST", body: form });
@@ -55,101 +65,127 @@ export default function AddMemory({ onExplore }: { onExplore: () => void }) {
       setStatus("error");
       setError(String(err instanceof Error ? err.message : err));
     }
-  }, [file, date, audio.blob]);
+  }, [file, name, date, audio.blob]);
+
+  // "Memory added" is a transient state — it settles, then drifts to Explore. Tapping
+  // it advances immediately.
+  useEffect(() => {
+    if (status !== "done") return;
+    const t = setTimeout(onAdded, 2600);
+    return () => clearTimeout(t);
+  }, [status, onAdded]);
 
   if (status === "done") {
     return (
-      <main className={styles.screen}>
-        <div className={styles.center}>
-          <div className={styles.tick} aria-hidden>
-            <Check width={32} height={32} />
-          </div>
-          <h1 className={styles.title}>Memory added</h1>
-          <p className={styles.sub}>It’s finding its place in the city.</p>
-          <button className={styles.primary} onClick={onExplore}>
-            Explore the city
-          </button>
-        </div>
+      <main className={styles.screen} onClick={onAdded}>
+        <h1 className={styles.addedTitle}>Memory added</h1>
+        <p className={styles.addedSub}>
+          It’s finding its place
+          <br />
+          in the city
+        </p>
       </main>
     );
   }
 
+  const openDate = () => {
+    const el = dateInput.current;
+    if (!el) return;
+    if (typeof el.showPicker === "function") el.showPicker();
+    else el.focus();
+  };
+  const dateLabel = date
+    ? new Date(date).toLocaleDateString(undefined, { month: "long", year: "numeric" })
+    : "Add a date";
+
+  const narrateLabel = audio.url
+    ? "Voice note added"
+    : audio.recording
+      ? "Recording — tap to stop"
+      : "Narrate";
+  const onNarrate = () => {
+    if (audio.url) audio.reset();
+    else if (audio.recording) audio.stop();
+    else audio.start();
+  };
+
   return (
     <main className={styles.screen}>
-      <div className={styles.center}>
-        <h1 className={styles.title}>Add a memory</h1>
-        <p className={styles.sub}>Choose a photo to place in the shared city.</p>
+      <input
+        ref={photoInput}
+        type="file"
+        accept="image/jpeg,image/png"
+        className={styles.hiddenInput}
+        onChange={(e) => choose(e.target.files)}
+      />
+      <input
+        ref={dateInput}
+        type="date"
+        className={styles.hiddenInput}
+        max={new Date().toISOString().slice(0, 10)}
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+      />
+
+      <div className={styles.addContent}>
+        <button
+          type="button"
+          className={styles.photo}
+          onClick={() => photoInput.current?.click()}
+          aria-label={file ? "Change photo" : "Choose a photo"}
+        >
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewUrl} alt="" className={styles.photoImg} />
+          ) : (
+            <>
+              <span className={styles.photoWell} />
+              <Plus className={styles.photoPlus} aria-hidden />
+            </>
+          )}
+        </button>
 
         <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png"
-          hidden
-          onChange={(e) => choose(e.target.files)}
+          className={styles.serifField}
+          value={name}
+          placeholder="Name this memory"
+          onChange={(e) => setName(e.target.value)}
+          aria-label="Name this memory"
         />
 
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt="" className={styles.preview} />
-        ) : null}
+        <button
+          type="button"
+          className={`${styles.serifButton} ${date ? styles.serifButtonSet : ""}`}
+          onClick={openDate}
+        >
+          {dateLabel}
+        </button>
 
-        {status === "selected" || status === "uploading" ? (
-          <>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>When was this taken? (optional)</span>
-              <input
-                type="date"
-                className={styles.dateInput}
-                value={date}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </label>
-
-            {audio.supported ? (
-              <div className={styles.audio}>
-                {audio.url ? (
-                  <>
-                    <audio src={audio.url} controls className={styles.player} />
-                    <button className={styles.ghost} onClick={audio.reset}>
-                      Re-record voice note
-                    </button>
-                  </>
-                ) : audio.recording ? (
-                  <button className={styles.recording} onClick={audio.stop}>
-                    <Recording01 width={18} height={18} aria-hidden /> Stop recording
-                  </button>
-                ) : (
-                  <button className={styles.ghost} onClick={audio.start}>
-                    <Microphone01 width={18} height={18} aria-hidden /> Record a voice note (optional)
-                  </button>
-                )}
-                {audio.error ? <p className={styles.error}>{audio.error}</p> : null}
-              </div>
-            ) : null}
-
-            <button
-              className={styles.primary}
-              onClick={upload}
-              disabled={status === "uploading"}
-            >
-              {status === "uploading" ? "Adding…" : "Add to the city"}
-            </button>
-            <button className={styles.ghost} onClick={() => inputRef.current?.click()}>
-              Choose another
-            </button>
-          </>
-        ) : (
-          <button className={styles.pick} onClick={() => inputRef.current?.click()}>
-            <span className={styles.plus} aria-hidden>
-              <Plus width={36} height={36} />
-            </span>
-            Choose a photo
+        {mounted && audio.supported && (
+          <button
+            type="button"
+            className={`${styles.serifButton} ${audio.url ? styles.serifButtonSet : ""}`}
+            onClick={onNarrate}
+          >
+            {narrateLabel}
           </button>
         )}
 
-        {error ? <p className={styles.error}>{error}</p> : null}
+        <button
+          type="button"
+          className={styles.addAction}
+          onClick={upload}
+          disabled={!file || status === "uploading"}
+        >
+          {status === "uploading" ? "Adding…" : "Add to the city"}
+        </button>
+
+        {error && <p className={styles.addError}>{error}</p>}
       </div>
+
+      <button className={styles.addSecondary} onClick={() => photoInput.current?.click()}>
+        Choose another photo
+      </button>
     </main>
   );
 }

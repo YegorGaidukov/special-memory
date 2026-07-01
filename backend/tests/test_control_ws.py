@@ -54,6 +54,21 @@ def test_jump_is_broadcast(client):
             assert jump_msg == {"type": "jump", "target": "random"}
 
 
+def test_filter_is_broadcast(client):
+    with client.websocket_connect("/ws/control?role=display") as disp:
+        disp.receive_json()
+        with client.websocket_connect("/ws/control?role=controller&clientId=a") as ctl:
+            ctl.send_json(
+                {"type": "state", "move": {"x": 0, "y": 0}, "look": {"x": 0, "y": 0},
+                 "filter": {"from": 2012, "to": 2026}}
+            )
+            ctl.receive_json()  # status
+            control_msg = disp.receive_json()
+            filter_msg = disp.receive_json()
+            assert control_msg["type"] == "control"
+            assert filter_msg == {"type": "filter", "from": 2012.0, "to": 2026.0}
+
+
 def test_release_zeroes_and_frees(client):
     with client.websocket_connect("/ws/control?role=display") as disp:
         disp.receive_json()
