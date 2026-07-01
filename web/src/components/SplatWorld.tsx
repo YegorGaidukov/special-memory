@@ -343,12 +343,17 @@ export default function SplatWorld() {
 }
 
 // A soft edge-darkening overlay. On a projector the image has a hard rectangular
-// cutoff; fading the frame into the void color melts that border into the ambient
-// so the picture reads as glowing out of darkness rather than a bright rectangle.
+// cutoff; fading each edge straight into the void color melts that border into the
+// ambient so the picture reads as glowing out of darkness rather than a bright
+// rectangle. Four straight (linear) gradients — one per edge — stacked, each
+// fading from the void color at its edge to transparent inward (no radial falloff,
+// so corners are the natural overlap of two edges).
 // pointerEvents:none so it never intercepts clicks/drags; sits above the canvas
 // but below the toolbar/HUD (those use higher z-index).
 function Vignette({ theme }: { theme: "dark" | "light" }) {
   const edge = theme === "dark" ? "5, 6, 10" : "238, 241, 246";
+  const band = (dir: string) =>
+    `linear-gradient(${dir}, rgba(${edge}, 0.9) 0%, rgba(${edge}, 0) 14%)`;
   return (
     <div
       aria-hidden
@@ -357,7 +362,12 @@ function Vignette({ theme }: { theme: "dark" | "light" }) {
         inset: 0,
         zIndex: 30,
         pointerEvents: "none",
-        background: `radial-gradient(ellipse 75% 75% at 50% 50%, rgba(${edge}, 0) 60%, rgba(${edge}, 0.55) 88%, rgba(${edge}, 0.9) 100%)`,
+        background: [
+          band("to right"),
+          band("to left"),
+          band("to bottom"),
+          band("to top"),
+        ].join(", "),
       }}
     />
   );
