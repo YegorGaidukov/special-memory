@@ -6,6 +6,7 @@ real-time joystick (WebSocket) is added in Phase 5.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from datetime import datetime, timezone
@@ -26,7 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from . import config, services
-from .control import Controller, parse_control_state, parse_place
+from .control import Controller, DriveCode, parse_control_state, parse_place
 from .assets import asset_content_type, safe_asset_name
 from .exifdata import parse_placement, resolve_captured_at
 from .ids import ext_of, make_record_id
@@ -249,8 +250,13 @@ def get_asset(name: str):
 
 # --- real-time joystick (single driver) -----------------------------------------
 
-_controller = Controller(idle_timeout=8.0)
+# The projector shows a rotating "drive code"; a phone must submit the current code to
+# take (or preempt) control, so only someone who can see the screen can drive. Polled at
+# _PRESENCE_POLL_S so each display refreshes its badge within a few seconds of a rotation.
+_presence = DriveCode(rotate_s=config.DRIVE_CODE_ROTATE_S) if config.DRIVE_CODE_ENABLED else None
+_controller = Controller(idle_timeout=8.0, presence=_presence)
 _displays: set[WebSocket] = set()
+_PRESENCE_POLL_S = 2.0
 
 
 async def _broadcast(payload: dict) -> None:
@@ -266,6 +272,26 @@ async def _broadcast_control() -> None:
     await _broadcast({"type": "control", **_controller.state(), "driver": driving})
 
 
+def _current_code() -> Optional[str]:
+    """The presence code to show on the projector now, or None when the gate is off."""
+    p = _controller.presence
+    return p.current(time.monotonic()) if p is not None else None
+
+
+async def _presence_poll(ws: WebSocket, last: str) -> None:
+    """Push a fresh drive code to one display whenever it rotates. Runs alongside the
+    display's disconnect-detect receive loop and is cancelled when that socket closes."""
+    try:
+        while True:
+            await asyncio.sleep(_PRESENCE_POLL_S)
+            code = _current_code()
+            if code is not None and code != last:
+                last = code
+                await ws.send_json({"type": "presence", "code": code})
+    except (WebSocketDisconnect, RuntimeError):
+        pass  # socket closed under us; the display branch handles cleanup
+
+
 @app.websocket("/ws/control")
 async def control_ws(ws: WebSocket):
     """The projector connects as ?role=display (receives the driver's control state);
@@ -276,13 +302,20 @@ async def control_ws(ws: WebSocket):
 
     if role == "display":
         _displays.add(ws)
+        poll: Optional[asyncio.Task] = None
         try:
             await _broadcast_control()  # current snapshot to the new display
+            code = _current_code()
+            if code is not None:
+                await ws.send_json({"type": "presence", "code": code})
+                poll = asyncio.create_task(_presence_poll(ws, code))
             while True:
                 await ws.receive_text()  # displays don't send; this detects disconnect
         except WebSocketDisconnect:
             pass
         finally:
+            if poll is not None:
+                poll.cancel()
             _displays.discard(ws)
         return
 
@@ -300,8 +333,12 @@ async def control_ws(ws: WebSocket):
             mtype = msg.get("type")
 
             if mtype == "request":
-                ok = _controller.request(client_id, now)
+                ok = _controller.request(client_id, now, msg.get("code"))
                 await ws.send_json({"type": "status", "driving": ok})
+                if ok:
+                    # A successful (possibly preempting) claim: refresh the displays so a
+                    # takeover zeroes the previous driver's held vector immediately.
+                    await _broadcast_control()
             elif mtype == "release":
                 _controller.release(client_id)
                 await ws.send_json({"type": "status", "driving": False})

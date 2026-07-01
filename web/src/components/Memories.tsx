@@ -37,11 +37,19 @@ import type { MemoryRecord, Vec3 } from "@/lib/manifest/types";
 export default function Memories({
   records,
   forceResidentId = null,
+  prefetchId = null,
+  onPrefetchPromoted,
 }: {
   records: MemoryRecord[];
   // Keep this memory's full splat resident regardless of distance (the explorer
   // edit mode pins the selected memory so its gizmo can attach to a loaded mesh).
   forceResidentId?: string | null;
+  // The fly-to target: start downloading its full splat now (while the flight is
+  // still in progress) but keep it hidden until the camera actually enters
+  // LOD.loadRadius, so on arrival it reveals with no download wait. Cleared by the
+  // parent once we promote it (onPrefetchPromoted) or the flight is cancelled.
+  prefetchId?: string | null;
+  onPrefetchPromoted?: (id: string) => void;
 }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
@@ -50,6 +58,8 @@ export default function Memories({
   // Read inside useFrame without re-binding the loop each render.
   const forceResidentIdRef = useRef(forceResidentId);
   forceResidentIdRef.current = forceResidentId;
+  const onPrefetchPromotedRef = useRef(onPrefetchPromoted);
+  onPrefetchPromotedRef.current = onPrefetchPromoted;
 
   // Latest records, read inside useFrame / async callbacks so transform edits are
   // picked up without tearing the SparkRenderer down. The heavy setup effect
@@ -63,6 +73,12 @@ export default function Memories({
   const sparkRef = useRef<SparkRenderer | null>(null);
   const previews = useRef<Map<string, THREE.Points>>(new Map());
   const splats = useRef<Map<string, SplatMesh>>(new Map());
+  // Prefetched splats that have been loaded (or are loading) but not yet revealed:
+  // their download was kicked off at travel start and they sit hidden at opacity 0
+  // until the camera enters range. Excluded from the decideLod "resident" set so
+  // decideLod re-picks them into `toLoad` on arrival (which starts their fade), and
+  // never unloads them while far. Cleared on promotion, cancel, or teardown.
+  const prefetchedHidden = useRef<Set<string>>(new Set());
   const sinceTick = useRef(0);
   // In-progress cross-dissolves, advanced every frame. `dir` is +1 fading the
   // splat in (ghost out) or -1 fading it out (ghost back in); a completed
@@ -70,6 +86,48 @@ export default function Memories({
   const fades = useRef<
     Map<string, { mesh: SplatMesh; points?: THREE.Points; t: number; dir: 1 | -1 }>
   >(new Map());
+
+  // Create the full SplatMesh for a record and start its `.sog` download. Shared by
+  // the residency tick (fadeOnInit=true → cross-dissolve in as soon as it loads) and
+  // the prefetch effect (fadeOnInit=false → load hidden; the tick starts the fade on
+  // arrival). Kept in a ref so both callers use one implementation; it only closes
+  // over stable values (scene + the maps above).
+  const startSplatLoad = useRef<(r: MemoryRecord, fadeOnInit: boolean) => void>(() => {});
+  startSplatLoad.current = (r, fadeOnInit) => {
+    const id = r.id;
+    const { position, rotation, scale } = toSplatSceneArgs(r);
+    const mesh = new SplatMesh({
+      url: resolveAssetUrl(MEMORIES_BASE_URL, r.splat_url),
+    });
+    mesh.position.set(position[0], position[1], position[2]);
+    mesh.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+    mesh.scale.setScalar(scale[0]); // SplatMesh scale is uniform
+    mesh.opacity = 0; // start invisible; the cross-dissolve fades it in
+    splats.current.set(id, mesh);
+    scene.add(mesh);
+
+    mesh.initialized
+      .then(() => {
+        // Cross-dissolve the point cloud into the splat — but only if this mesh
+        // is still the resident one (it may have been disposed mid-load).
+        if (splats.current.get(id) !== mesh) return;
+        // Resident and loaded: expose it so the edit gizmo can attach.
+        setResident(id, mesh);
+        // A prefetched mesh loads hidden — the residency tick starts its fade when
+        // the camera arrives (so it doesn't pop in mid-flight from a distance).
+        if (fadeOnInit)
+          fades.current.set(id, { mesh, points: previews.current.get(id), t: 0, dir: 1 });
+      })
+      .catch((err) => {
+        if (splats.current.get(id) !== mesh) return; // disposed mid-load
+        console.error("[explorer] splat load failed", id, err);
+        clearResident(id);
+        splats.current.delete(id);
+        prefetchedHidden.current.delete(id);
+        scene.remove(mesh);
+        mesh.dispose();
+      });
+  };
 
   // Build the SparkRenderer + load a point-cloud preview per memory.
   useEffect(() => {
@@ -127,11 +185,39 @@ export default function Memories({
         mesh.dispose();
       }
       loadedSplats.clear();
+      prefetchedHidden.current.clear();
       scene.remove(spark);
       spark.dispose();
       sparkRef.current = null;
     };
   }, [gl, scene, sig]);
+
+  // Prefetch the fly-to target's full splat the moment travel begins, so its `.sog`
+  // downloads DURING the flight instead of only after the camera lands. It loads
+  // hidden (opacity 0, no fade) and is excluded from the residency "resident" set,
+  // so the residency tick reveals it (starts its cross-dissolve) once the camera
+  // enters LOD.loadRadius — with the download already done. Fires immediately (no
+  // 200 ms tick wait). If the flight is cancelled/replaced before the camera lands
+  // (the id is still hidden on cleanup), the wasted mesh is disposed.
+  useEffect(() => {
+    if (!prefetchId) return;
+    const r = recordsRef.current.find((x) => x.id === prefetchId);
+    // Skip if already loaded/loading via normal LOD (near the target already) — we
+    // must not adopt or dispose a mesh the residency loop owns.
+    if (!r || splats.current.has(prefetchId)) return;
+    prefetchedHidden.current.add(prefetchId);
+    startSplatLoad.current(r, false);
+    return () => {
+      if (!prefetchedHidden.current.has(prefetchId)) return; // already revealed → LOD owns it
+      prefetchedHidden.current.delete(prefetchId);
+      const mesh = splats.current.get(prefetchId);
+      if (!mesh) return;
+      clearResident(prefetchId);
+      splats.current.delete(prefetchId);
+      scene.remove(mesh);
+      mesh.dispose();
+    };
+  }, [prefetchId, scene]);
 
   // Re-place ghosts + resident splats in place when a memory's stored transform
   // changes (a curator edit overlaid onto `records`), without rebuilding the
@@ -202,8 +288,13 @@ export default function Memories({
     const camPos: Vec3 = [camera.position.x, camera.position.y, camera.position.z];
     // A splat mid out-fade counts as "not resident", so a camera that turns back
     // reverses its fade (reusing the mesh, below) instead of disposing+reloading.
+    // Prefetched-hidden splats also count as "not resident" so decideLod re-picks
+    // them into `toLoad` the moment the camera enters range (revealing them) yet
+    // never unloads them while far.
     const resident = new Set(
-      [...splats.current.keys()].filter((id) => fades.current.get(id)?.dir !== -1),
+      [...splats.current.keys()].filter(
+        (id) => fades.current.get(id)?.dir !== -1 && !prefetchedHidden.current.has(id),
+      ),
     );
     const decided = decideLod(records, camPos, resident, LOD);
     let toLoad = decided.toLoad;
@@ -221,7 +312,8 @@ export default function Memories({
       const r = records.find((x) => x.id === id);
       if (!r) continue;
 
-      // Already have a mesh (it was fading out) — reverse it back in, reusing it.
+      // Already have a mesh — reuse it. Either it was fading out (reverse it back
+      // in) or it was prefetched-hidden and the camera has now arrived (reveal it).
       const existing = splats.current.get(id);
       if (existing) {
         const f = fades.current.get(id);
@@ -231,37 +323,13 @@ export default function Memories({
           t: f ? f.t : 0,
           dir: 1,
         });
+        // Promotion: a prefetched-hidden splat just entered range — its download is
+        // already done, so this reveal has no network wait. Release the parent's pin.
+        if (prefetchedHidden.current.delete(id)) onPrefetchPromotedRef.current?.(id);
         continue;
       }
 
-      const { position, rotation, scale } = toSplatSceneArgs(r);
-      const mesh = new SplatMesh({
-        url: resolveAssetUrl(MEMORIES_BASE_URL, r.splat_url),
-      });
-      mesh.position.set(position[0], position[1], position[2]);
-      mesh.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
-      mesh.scale.setScalar(scale[0]); // SplatMesh scale is uniform
-      mesh.opacity = 0; // start invisible; the cross-dissolve fades it in
-      splats.current.set(id, mesh);
-      scene.add(mesh);
-
-      mesh.initialized
-        .then(() => {
-          // Cross-dissolve the point cloud into the splat — but only if this mesh
-          // is still the resident one (it may have been disposed mid-load).
-          if (splats.current.get(id) !== mesh) return;
-          // Resident and loaded: expose it so the edit gizmo can attach.
-          setResident(id, mesh);
-          fades.current.set(id, { mesh, points: previews.current.get(id), t: 0, dir: 1 });
-        })
-        .catch((err) => {
-          if (splats.current.get(id) !== mesh) return; // disposed mid-load
-          console.error("[explorer] splat load failed", id, err);
-          clearResident(id);
-          splats.current.delete(id);
-          scene.remove(mesh);
-          mesh.dispose();
-        });
+      startSplatLoad.current(r, true);
     }
 
     for (const id of toUnload) {

@@ -1,4 +1,4 @@
-from backend.control import Controller, parse_control_state, parse_place
+from backend.control import Controller, DriveCode, parse_control_state, parse_place
 
 
 class TestParseControlState:
@@ -146,6 +146,101 @@ class TestController:
         c.set_state("a", {"move": {"x": 1, "y": 0}}, now=0)
         c.set_state("a", {"move": {"x": 0.2, "y": 0}}, now=5)
         assert c.current_driver(now=7) == "a"
+
+
+class TestDriveCode:
+    def test_current_is_stable_within_an_epoch(self):
+        dc = DriveCode(rotate_s=60)
+        c = dc.current(now=0)
+        assert dc.current(now=30) == c  # same epoch -> same code
+        assert len(c) == 4 and c.isdigit()
+
+    def test_code_rotates_on_new_epoch(self):
+        # Codes are random; retry a few epochs to avoid a 1/10000 same-code fluke.
+        dc = DriveCode(rotate_s=60)
+        first = dc.current(now=0)
+        assert any(dc.current(now=60 * (i + 1)) != first for i in range(5))
+
+    def test_current_code_is_valid(self):
+        dc = DriveCode(rotate_s=60)
+        c = dc.current(now=10)
+        assert dc.valid(c, now=10) is True
+
+    def test_previous_code_still_accepted_after_one_rotation(self):
+        dc = DriveCode(rotate_s=60)
+        old = dc.current(now=0)
+        dc.current(now=60)  # rotate once (old becomes "previous")
+        assert dc.valid(old, now=70) is True
+
+    def test_code_rejected_after_two_rotations(self):
+        dc = DriveCode(rotate_s=60)
+        old = dc.current(now=0)
+        dc.current(now=120)  # jumped two epochs -> overlap dropped
+        assert dc.valid(old, now=120) is False
+
+    def test_rejects_missing_or_non_string(self):
+        dc = DriveCode(rotate_s=60)
+        dc.current(now=0)
+        assert dc.valid(None, now=0) is False
+        assert dc.valid("", now=0) is False
+        assert dc.valid(1234, now=0) is False
+        assert dc.valid("0000nope", now=0) is False
+
+
+class TestPresenceGatedController:
+    def _gated(self):
+        c = Controller(idle_timeout=8, presence=DriveCode(rotate_s=60))
+        return c, c.presence.current(now=0)
+
+    def test_claim_requires_valid_code(self):
+        c, _ = self._gated()
+        assert c.request("a", now=0) is False  # no code
+        assert c.request("a", now=0, code="9999x") is False  # wrong code
+        assert c.current_driver(now=0) is None
+
+    def test_valid_code_claims(self):
+        c, code = self._gated()
+        assert c.request("a", now=0, code=code) is True
+        assert c.current_driver(now=0) == "a"
+
+    def test_valid_code_preempts_current_driver(self):
+        c, code = self._gated()
+        c.request("a", now=0, code=code)
+        # A present phone B submits the current code and takes over instantly.
+        assert c.request("b", now=1, code=code) is True
+        assert c.current_driver(now=1) == "b"
+
+    def test_preemption_clears_previous_driver_vector(self):
+        c, code = self._gated()
+        c.request("a", now=0, code=code)
+        c.set_state("a", {"move": {"x": 1, "y": 0}}, now=0)
+        c.request("b", now=1, code=code)  # takeover zeroes the held vector
+        assert c.state()["move"] == {"x": 0.0, "y": 0.0}
+
+    def test_set_state_does_not_auto_claim(self):
+        c, _ = self._gated()
+        # Streaming state without a granted code cannot grab a free token.
+        assert c.set_state("a", {"move": {"x": 1, "y": 0}}, now=0) is False
+        assert c.current_driver(now=0) is None
+
+    def test_preempted_phone_cannot_regrab_by_streaming(self):
+        c, code = self._gated()
+        c.request("a", now=0, code=code)
+        c.request("b", now=1, code=code)  # b preempts
+        # a keeps streaming but is no longer the driver and can't reclaim the token.
+        assert c.set_state("a", {"move": {"x": 1, "y": 0}}, now=2) is False
+        assert c.current_driver(now=2) == "b"
+
+    def test_idle_timeout_still_frees(self):
+        c, code = self._gated()
+        c.request("a", now=0, code=code)
+        assert c.current_driver(now=20) is None  # > idle_timeout, no input
+
+    def test_release_still_works(self):
+        c, code = self._gated()
+        c.request("a", now=0, code=code)
+        assert c.release("a") is True
+        assert c.current_driver(now=0) is None
 
 
 class TestParsePlace:

@@ -515,6 +515,48 @@
   color: rgb(var(--ink) / 0.45);
 }
 
+/* Drive-code gate — the rotating presence code (shown on the projector) that a phone
+   must enter to take control. Floats above the pads near the top; hidden while driving. */
+.codeGate {
+  position: absolute;
+  left: var(--pad);
+  right: var(--pad);
+  top: max(112px, calc(env(safe-area-inset-top) + 92px));
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.codeLabel {
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgb(var(--ink) / 0.45);
+}
+.codeInput {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 40px;
+  /* letter-spacing pushes the last glyph right; the matching text-indent re-centres. */
+  letter-spacing: 0.4em;
+  text-indent: 0.4em;
+  width: 4.6em;
+  text-align: center;
+  color: rgb(var(--ink));
+  background: none;
+  border: none;
+  border-bottom: 2px solid rgb(var(--ink) / 0.24);
+  outline: none;
+  padding: 4px 0;
+}
+.codeInput::placeholder {
+  color: rgb(var(--ink) / 0.22);
+}
+
 /* --- timeline (bottom of Navigate) ------------------------------------------- */
 
 .timeline {

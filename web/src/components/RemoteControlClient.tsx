@@ -12,12 +12,15 @@ export default function RemoteControlClient({
   onJump,
   onFilter,
   onPlace,
+  onPresenceCode,
 }: {
   onJump: (target: string) => void;
   /** A timeline year-range from the phone: show only memories captured within it. */
   onFilter?: (from: number, to: number) => void;
   /** A memory-move from the phone Explore field: slide memory `id` to world x/z. */
   onPlace?: (id: string, x: number, z: number) => void;
+  /** The rotating "drive code" to show on screen (proves a phone is in the room). */
+  onPresenceCode?: (code: string) => void;
 }) {
   useEffect(() => {
     let closed = false;
@@ -54,6 +57,8 @@ export default function RemoteControlClient({
             typeof msg.z === "number"
           ) {
             onPlace?.(msg.id, msg.x, msg.z);
+          } else if (msg.type === "presence" && typeof msg.code === "string") {
+            onPresenceCode?.(msg.code);
           }
         } catch {
           /* ignore malformed frames */
@@ -73,7 +78,7 @@ export default function RemoteControlClient({
       resetRemoteControl();
       ws?.close();
     };
-  }, [onJump, onFilter, onPlace]);
+  }, [onJump, onFilter, onPlace, onPresenceCode]);
 
   return null;
 }

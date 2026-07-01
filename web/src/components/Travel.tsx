@@ -25,6 +25,8 @@ export default function Travel({
   onArrive,
   travelToId,
   onTravelStarted,
+  onTravelStart,
+  onTravelCancel,
 }: {
   records: MemoryRecord[];
   onArrive?: (record: MemoryRecord) => void;
@@ -33,6 +35,11 @@ export default function Travel({
   // reset it — re-picking the same id then fires again.
   travelToId?: string | null;
   onTravelStarted?: () => void;
+  // A fly-to just began toward this id — the parent prefetches its full splat so
+  // it downloads during the flight. onTravelCancel fires when an in-progress
+  // flight is abandoned, releasing that prefetch.
+  onTravelStart?: (id: string) => void;
+  onTravelCancel?: () => void;
 }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
@@ -47,6 +54,10 @@ export default function Travel({
   recordsRef.current = records;
   const onArriveRef = useRef(onArrive);
   onArriveRef.current = onArrive;
+  const onTravelStartRef = useRef(onTravelStart);
+  onTravelStartRef.current = onTravelStart;
+  const onTravelCancelRef = useRef(onTravelCancel);
+  onTravelCancelRef.current = onTravelCancel;
   const controlsRef = useRef(controls);
   controlsRef.current = controls;
 
@@ -64,6 +75,7 @@ export default function Travel({
     fly.current = makeFlyTo(from, to, FLY_TO_DURATION_MS);
     flyElapsed.current = 0;
     flyTarget.current = hit;
+    onTravelStartRef.current?.(hit.id); // prefetch the target's splat during the flight
     const c = controlsRef.current;
     if (c) c.enabled = false; // suspend orbit + WASD for the duration of the flight
   });
@@ -85,6 +97,7 @@ export default function Travel({
     const cancel = () => {
       if (!fly.current) return;
       fly.current = null;
+      onTravelCancelRef.current?.(); // release the prefetch for the abandoned flight
       const c = controlsRef.current;
       if (c) c.enabled = true;
     };

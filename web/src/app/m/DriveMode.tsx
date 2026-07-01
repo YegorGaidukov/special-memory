@@ -45,14 +45,20 @@ export default function DriveMode({
   const lookP = useRef<Pad | null>(null);
   const requested = useRef(false);
   const pendingRecenter = useRef(false);
+  // The rotating "drive code" shown on the projector — proof this phone is in the room.
+  // Taking control requires submitting it; a phone that left the venue can't see it.
+  const [code, setCode] = useState("");
 
   const anyPad = () => moveP.current !== null || lookP.current !== null;
 
-  // Steady state push. Gyro: move + latest absolute aim continuously (look without a
-  // finger down); stick: move + look only while a pad is held. Recenter rides the first
-  // valid aim after a request.
+  // Steady state push, but ONLY while this phone actually holds the token. Gating on
+  // `driving` is what stops a departed/preempted phone from streaming: gyro mode used to
+  // push every tick unconditionally, which both moved the view after handoff and kept the
+  // idle timeout from ever firing. Gyro: move + latest absolute aim continuously; stick:
+  // move + look only while a pad is held. Recenter rides the first valid aim after a claim.
   useEffect(() => {
     const t = setInterval(() => {
+      if (!driving) return;
       if (gyro) {
         const aim = readAim();
         const msg: Record<string, unknown> = { type: "state", move: move.current };
@@ -69,18 +75,33 @@ export default function DriveMode({
       }
     }, SEND_MS);
     return () => clearInterval(t);
-  }, [send, gyro, readAim]);
+  }, [send, gyro, readAim, driving]);
 
   // Release the driver token when leaving Navigate (mode switch unmounts this surface).
   useEffect(() => {
     return () => send({ type: "release" });
   }, [send]);
 
+  // Whenever we're not the driver (never claimed, preempted by another present visitor,
+  // or idle-timed-out) re-arm claiming so the next MOVE touch / gyro-on re-requests with
+  // the current code — instead of silently doing nothing.
+  useEffect(() => {
+    if (!driving) requested.current = false;
+  }, [driving]);
+
+  // Claim (or preempt) the driver token, presenting the current code. The backend grants
+  // it to the latest present visitor and refuses a stale/absent code (a phone that left).
+  const claim = (c: string) => {
+    requested.current = true;
+    send(c.length === 4 ? { type: "request", code: c } : { type: "request" });
+  };
   const ensureDriving = () => {
-    if (!requested.current) {
-      requested.current = true;
-      send({ type: "request" });
-    }
+    if (!requested.current) claim(code);
+  };
+  const onCodeChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    setCode(digits);
+    if (digits.length === 4) claim(digits); // finished typing -> take control now
   };
   const maybeRelease = () => {
     if (!gyro && !anyPad() && requested.current) {
@@ -135,8 +156,7 @@ export default function DriveMode({
       requested.current = false;
     } else if (await enableGyro()) {
       pendingRecenter.current = true; // baseline "forward" on the first reading
-      send({ type: "request" });
-      requested.current = true;
+      claim(code);
       setGyro(true);
     }
   };
@@ -158,6 +178,26 @@ export default function DriveMode({
   return (
     <main className={styles.navSurface}>
       {status && <span className={styles.navStatus}>{status}</span>}
+
+      {/* Presence gate: to drive, enter the rotating code shown on the projected screen.
+          It disappears once this phone holds control; it reappears if control is lost
+          (someone present took over, or the phone went idle). */}
+      {!driving && (
+        <div className={styles.codeGate}>
+          <span className={styles.codeLabel}>Enter the code on the screen</span>
+          <input
+            className={styles.codeInput}
+            value={code}
+            onChange={(e) => onCodeChange(e.target.value)}
+            inputMode="numeric"
+            pattern="\d*"
+            maxLength={4}
+            autoComplete="off"
+            placeholder="0000"
+            aria-label="Drive code shown on the projector"
+          />
+        </div>
+      )}
 
       {gyroStatus !== "unsupported" && (
         <button

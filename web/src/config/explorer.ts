@@ -28,7 +28,7 @@ export const LOD = {
 // splat. pointSize is the world-space size of each preview point (metres,
 // distance-attenuated). On load, the point cloud cross-dissolves into the splat
 // over fadeMs. Point count is fixed at build time by `convert-splats`.
-export const PREVIEW = { pointSize: 0.12, fadeMs: 2500 } as const;
+export const PREVIEW = { pointSize: 0.12, fadeMs: 800 } as const;
 
 // How often (ms) to re-evaluate splat residency as the cameraw moves. The check
 // is cheap (distance compares), so this just avoids running it every frame.

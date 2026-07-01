@@ -56,8 +56,16 @@ export default function SplatWorld() {
   // the same memory again re-fires.
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [travelToId, setTravelToId] = useState<string | null>(null);
+  // The memory a fly-to is currently heading to. Set the moment travel begins so
+  // Memories prefetches its full splat during the flight (ready on arrival, rather
+  // than only starting to download once the camera lands); cleared when Memories
+  // reveals it or the flight is cancelled.
+  const [prefetchId, setPrefetchId] = useState<string | null>(null);
   // Browsers block audio until a user gesture; the "enable sound" button flips this.
   const [soundEnabled, setSoundEnabled] = useState(false);
+  // The rotating "drive code" from the backend, shown as a small badge so visitors can
+  // enter it on their phone to take control (null until the backend sends one / gate off).
+  const [presenceCode, setPresenceCode] = useState<string | null>(null);
 
   // Edit mode: a curator toggle (off by default — the public fly-through is
   // untouched). Navigation (orbit + WASD) is shared by both modes; edit mode adds
@@ -260,6 +268,8 @@ export default function SplatWorld() {
           <Memories
             records={editMode ? records : visibleRecords}
             forceResidentId={editMode ? selectedId : null}
+            prefetchId={editMode ? null : prefetchId}
+            onPrefetchPromoted={() => setPrefetchId(null)}
           />
         )}
         {m.status === "ready" && (
@@ -280,6 +290,8 @@ export default function SplatWorld() {
             records={records}
             travelToId={travelToId}
             onTravelStarted={() => setTravelToId(null)}
+            onTravelStart={setPrefetchId}
+            onTravelCancel={() => setPrefetchId(null)}
           />
         )}
       </Canvas>
@@ -318,7 +330,65 @@ export default function SplatWorld() {
           )}
         </>
       )}
-      <RemoteControlClient onJump={handleRemoteJump} onFilter={handleFilter} onPlace={handleRemotePlace} />
+      <RemoteControlClient
+        onJump={handleRemoteJump}
+        onFilter={handleFilter}
+        onPlace={handleRemotePlace}
+        onPresenceCode={setPresenceCode}
+      />
+      {presenceCode && <DriveCodeBadge code={presenceCode} theme={theme} />}
+      <Vignette theme={theme} />
     </>
+  );
+}
+
+// A soft edge-darkening overlay. On a projector the image has a hard rectangular
+// cutoff; fading the frame into the void color melts that border into the ambient
+// so the picture reads as glowing out of darkness rather than a bright rectangle.
+// pointerEvents:none so it never intercepts clicks/drags; sits above the canvas
+// but below the toolbar/HUD (those use higher z-index).
+function Vignette({ theme }: { theme: "dark" | "light" }) {
+  const edge = theme === "dark" ? "5, 6, 10" : "238, 241, 246";
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 30,
+        pointerEvents: "none",
+        background: `radial-gradient(ellipse 75% 75% at 50% 50%, rgba(${edge}, 0) 60%, rgba(${edge}, 0.55) 88%, rgba(${edge}, 0.9) 100%)`,
+      }}
+    />
+  );
+}
+
+// A small, unobtrusive corner badge showing the current drive code. A visitor reads it
+// off the projection and types it into their phone to take control — proof of presence,
+// so someone who left the venue can't drive. pointerEvents:none so it never eats clicks.
+function DriveCodeBadge({ code, theme }: { code: string; theme: "dark" | "light" }) {
+  const ink = theme === "dark" ? "#eef1f6" : "#05060a";
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: "18px",
+        left: "18px",
+        zIndex: 40,
+        pointerEvents: "none",
+        display: "flex",
+        flexDirection: "column",
+        gap: "3px",
+        fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+        color: ink,
+        opacity: 0.7,
+        userSelect: "none",
+      }}
+    >
+      <span style={{ fontSize: "10px", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.7 }}>
+        Drive code
+      </span>
+      <span style={{ fontSize: "26px", fontWeight: 600, letterSpacing: "0.3em" }}>{code}</span>
+    </div>
   );
 }
