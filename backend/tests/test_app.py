@@ -188,3 +188,36 @@ def test_ingest_after_assets_present(client):
     assert out.json()["record"]["status"] == "approved"
     manifest = json.loads((public / "manifest.json").read_text())
     assert [m["id"] for m in manifest["memories"]] == [rec["id"]]
+
+
+def _jpeg_with_exif_date(date: str = "2026:04:27 12:00:00") -> bytes:
+    """A tiny JPEG whose EXIF carries DateTimeOriginal (what an iPhone photo has)."""
+    import io
+
+    from PIL import Image
+
+    img = Image.new("RGB", (8, 8))
+    exif = Image.Exif()
+    exif[36867] = date  # DateTimeOriginal
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", exif=exif)
+    return buf.getvalue()
+
+
+def test_manual_date_wins_over_exif(client):
+    c, _ = client
+    rec = c.post(
+        "/api/memories",
+        data={"captured_at": "2026-05-01"},
+        files={"photo": ("a.jpg", _jpeg_with_exif_date(), "image/jpeg")},
+    ).json()["record"]
+    assert rec["captured_at"] == "2026-05-01T00:00:00.000Z"
+
+
+def test_exif_date_used_when_no_manual(client):
+    c, _ = client
+    rec = c.post(
+        "/api/memories",
+        files={"photo": ("a.jpg", _jpeg_with_exif_date(), "image/jpeg")},
+    ).json()["record"]
+    assert rec["captured_at"] == "2026-04-27T12:00:00.000Z"

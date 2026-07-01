@@ -28,7 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from . import config, services
 from .control import Controller, parse_control_state, parse_place
 from .assets import asset_content_type, safe_asset_name
-from .exifdata import parse_placement, validate_captured_at
+from .exifdata import parse_placement, resolve_captured_at
 from .ids import ext_of, make_record_id
 from .placement import placement_transform, scatter_near_cluster
 from .store import find_by_id, load_store
@@ -139,8 +139,9 @@ async def create_memory(
             standoff=config.FLY_TO_STANDOFF,
         )
 
-    # Capture time: EXIF wins; else the phone-supplied manual date (validated).
-    when = placement.get("captured_at") or validate_captured_at(captured_at)
+    # Capture time: the submitted date wins (the phone prefills from EXIF and lets
+    # the user edit); EXIF is the fallback for flows without a date field.
+    when = resolve_captured_at(placement.get("captured_at"), captured_at)
 
     # Optional voice note: saved straight into public/memories (no reconstruction).
     audio_url = None

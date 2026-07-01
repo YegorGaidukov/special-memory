@@ -44,6 +44,18 @@ def validate_captured_at(value) -> Optional[str]:
     return _to_iso_z(dt)
 
 
+def resolve_captured_at(exif_value: Optional[str], manual_raw) -> Optional[str]:
+    """Pick the record's capture time: the submitted date wins, EXIF is the fallback.
+
+    The phone prefills its date field from EXIF and lets the user edit, so a submitted
+    value is an explicit choice. Flows without a date field (desktop drag-drop) send
+    nothing and keep the EXIF value.
+    """
+    return validate_captured_at(manual_raw) or (
+        exif_value if isinstance(exif_value, str) else None
+    )
+
+
 def extract_placement(raw) -> dict:
     """Normalise a parsed-EXIF mapping into ``{geo?, captured_at?}``.
 
