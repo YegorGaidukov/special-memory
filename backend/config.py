@@ -33,10 +33,12 @@ STORE_PATH = _dir("MEMORIES_STORE_PATH", WEB_DIR / "data" / "memories.json")
 # Comma-separated allowed CORS origins (dev frontend); same-origin in prod needs none.
 CORS_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 
-# Presence-gated driving: the projector shows a short "drive code" that rotates every
-# DRIVE_CODE_ROTATE_S seconds; a phone must submit the current (or just-previous) code to
-# take control, proving it can read the projected screen — so a visitor who left the venue
-# (or re-opened the tab from home) can't drive, and any present visitor can preempt a stale
-# holder. Set DRIVE_CODE_ENABLED=0 for legacy first-come-wins (e.g. a display-less dev box).
-DRIVE_CODE_ENABLED = os.environ.get("DRIVE_CODE_ENABLED", "1") != "0"
-DRIVE_CODE_ROTATE_S = float(os.environ.get("DRIVE_CODE_ROTATE_S", "60"))
+# Presence-gated driving (no codes, no friction): only phones whose IP is inside one of
+# these CIDRs — the venue's network, e.g. its public egress or LAN — may take control; a
+# phone that left the venue (home/cellular) can still view + upload but can't drive.
+# Comma-separated, e.g. DRIVE_PRESENCE_CIDRS="203.0.113.0/24,192.168.1.0/24". EMPTY (the
+# default) turns gating OFF: control is then plain newest-grab-wins for everyone (a present
+# visitor always preempts a departed/idle one, but an active remote user could still fight).
+# Behind Caddy, run uvicorn with --forwarded-allow-ips 127.0.0.1 so the real phone IP (not
+# the proxy's) is seen — otherwise every client looks like localhost.
+DRIVE_PRESENCE_CIDRS = [c.strip() for c in os.environ.get("DRIVE_PRESENCE_CIDRS", "").split(",") if c.strip()]

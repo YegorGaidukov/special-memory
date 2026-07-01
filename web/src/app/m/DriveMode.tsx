@@ -34,7 +34,7 @@ export default function DriveMode({
   range: TimeRange | null;
   onRangeChange: (r: TimeRange) => void;
 }) {
-  const { driving, send } = useControlSocket();
+  const { driving, blockedRemote, send } = useControlSocket();
   const { status: gyroStatus, enable: enableGyro, disable: disableGyro, read: readAim } =
     useDeviceOrientation();
   const [gyro, setGyro] = useState(false);
@@ -45,9 +45,6 @@ export default function DriveMode({
   const lookP = useRef<Pad | null>(null);
   const requested = useRef(false);
   const pendingRecenter = useRef(false);
-  // The rotating "drive code" shown on the projector — proof this phone is in the room.
-  // Taking control requires submitting it; a phone that left the venue can't see it.
-  const [code, setCode] = useState("");
 
   const anyPad = () => moveP.current !== null || lookP.current !== null;
 
@@ -77,31 +74,43 @@ export default function DriveMode({
     return () => clearInterval(t);
   }, [send, gyro, readAim, driving]);
 
-  // Release the driver token when leaving Navigate (mode switch unmounts this surface).
+  // Release the driver token when leaving Navigate (mode switch unmounts this surface),
+  // AND the moment the visitor leaves this screen — tab hidden / app backgrounded / page
+  // hidden. So a visitor who pockets their phone or walks off frees control within a
+  // second, instead of holding it (or streaming gyro) until they explicitly come back.
   useEffect(() => {
-    return () => send({ type: "release" });
+    const release = () => {
+      requested.current = false;
+      send({ type: "release" });
+    };
+    const onHide = () => {
+      if (document.visibilityState === "hidden") release();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", release);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", release);
+      release();
+    };
   }, [send]);
 
   // Whenever we're not the driver (never claimed, preempted by another present visitor,
-  // or idle-timed-out) re-arm claiming so the next MOVE touch / gyro-on re-requests with
-  // the current code — instead of silently doing nothing.
+  // or idle-timed-out) re-arm claiming so the next MOVE touch / gyro-on re-requests
+  // instead of silently doing nothing.
   useEffect(() => {
     if (!driving) requested.current = false;
   }, [driving]);
 
-  // Claim (or preempt) the driver token, presenting the current code. The backend grants
-  // it to the latest present visitor and refuses a stale/absent code (a phone that left).
-  const claim = (c: string) => {
+  // Take (or preempt) the driver token — newest-grab-wins, so touching the controls hands
+  // control to whoever is driving now. The backend refuses a phone that's left the venue
+  // (when presence gating is on), which surfaces as `blockedRemote`.
+  const claim = () => {
     requested.current = true;
-    send(c.length === 4 ? { type: "request", code: c } : { type: "request" });
+    send({ type: "request" });
   };
   const ensureDriving = () => {
-    if (!requested.current) claim(code);
-  };
-  const onCodeChange = (raw: string) => {
-    const digits = raw.replace(/\D/g, "").slice(0, 4);
-    setCode(digits);
-    if (digits.length === 4) claim(digits); // finished typing -> take control now
+    if (!requested.current) claim();
   };
   const maybeRelease = () => {
     if (!gyro && !anyPad() && requested.current) {
@@ -156,7 +165,7 @@ export default function DriveMode({
       requested.current = false;
     } else if (await enableGyro()) {
       pendingRecenter.current = true; // baseline "forward" on the first reading
-      claim(code);
+      claim();
       setGyro(true);
     }
   };
@@ -170,34 +179,19 @@ export default function DriveMode({
     [onRangeChange, send],
   );
 
-  // Quiet by default (like the mock); only surface the states that need a word.
-  const status = gyroStatus === "denied" ? "Motion denied — use the look pad" : "";
+  // Quiet by default (like the mock); only surface the states that need a word. A phone
+  // that's left the installation can view but not drive (presence gate) — say so.
+  const status = blockedRemote
+    ? "Driving is available at the installation"
+    : gyroStatus === "denied"
+      ? "Motion denied — use the look pad"
+      : "";
 
   const lookDisabled = gyro;
 
   return (
     <main className={styles.navSurface}>
       {status && <span className={styles.navStatus}>{status}</span>}
-
-      {/* Presence gate: to drive, enter the rotating code shown on the projected screen.
-          It disappears once this phone holds control; it reappears if control is lost
-          (someone present took over, or the phone went idle). */}
-      {!driving && (
-        <div className={styles.codeGate}>
-          <span className={styles.codeLabel}>Enter the code on the screen</span>
-          <input
-            className={styles.codeInput}
-            value={code}
-            onChange={(e) => onCodeChange(e.target.value)}
-            inputMode="numeric"
-            pattern="\d*"
-            maxLength={4}
-            autoComplete="off"
-            placeholder="0000"
-            aria-label="Drive code shown on the projector"
-          />
-        </div>
-      )}
 
       {gyroStatus !== "unsupported" && (
         <button

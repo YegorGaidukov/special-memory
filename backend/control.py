@@ -7,8 +7,8 @@ real time. The WebSocket plumbing (connections, broadcast) lives in :mod:`backen
 """
 from __future__ import annotations
 
+import ipaddress
 import math
-import random
 from typing import Optional
 
 # Absolute "magic window" look: phone reports its orientation as yaw (wrapped to
@@ -107,67 +107,42 @@ def parse_control_state(raw) -> dict:
     return state
 
 
-class DriveCode:
-    """A short "you're in the room" presence code shown on the projector.
-
-    The code rotates every ``rotate_s`` seconds; a phone must submit the current (or
-    just-previous) code to take control, proving it can read the projected screen — a
-    visitor who left the venue can't, so they can't drive. Rotation is *lazy*: the code
-    is keyed to a monotonic-clock epoch (``now // rotate_s``) and regenerated when the
-    epoch advances, mirroring :meth:`Controller._expire` — no background timer needed to
-    keep the pure core valid. The previous epoch's code stays accepted (a one-epoch
-    overlap) so a rotation mid-entry never rejects a present visitor. The clock is
-    injected (``now`` passed in) so this is fully unit-tested without real time.
-    """
-
-    def __init__(self, rotate_s: float = 60.0, *, digits: int = 4):
-        self.rotate_s = rotate_s
-        self.digits = digits
-        self._rng = random.Random()
-        self._epoch: Optional[int] = None
-        self._current: Optional[str] = None
-        self._previous: Optional[str] = None
-
-    def _mint(self) -> str:
-        return f"{self._rng.randrange(10 ** self.digits):0{self.digits}d}"
-
-    def _roll(self, now: float) -> None:
-        epoch = int(now // self.rotate_s)
-        if self._epoch is None:
-            self._epoch, self._current, self._previous = epoch, self._mint(), None
-        elif epoch != self._epoch:
-            # Only the immediately-preceding epoch's code stays valid; jumping more than
-            # one epoch (idle projector) drops the overlap entirely.
-            self._previous = self._current if epoch == self._epoch + 1 else None
-            self._epoch, self._current = epoch, self._mint()
-
-    def current(self, now: float) -> str:
-        """The code to show on the projector right now (rotating it if the epoch turned)."""
-        self._roll(now)
-        assert self._current is not None
-        return self._current
-
-    def valid(self, code, now: float) -> bool:
-        """True if ``code`` matches the current or just-previous code (a present visitor)."""
-        if not isinstance(code, str) or not code:
-            return False
-        self._roll(now)
-        return code == self._current or (self._previous is not None and code == self._previous)
+def client_is_present(ip: Optional[str], cidrs) -> bool:
+    """Is a phone at ``ip`` "in the room"? True if no allowlist is configured (presence
+    gating off — the zero-config default), else True only when ``ip`` falls inside one of
+    the ``cidrs`` (the venue's network, e.g. its public egress). A visitor who left the
+    venue reaches the server from a different address and is refused control. Pure so the
+    IP logic is unit-tested; the socket→IP extraction is the seam in :mod:`backend.app`."""
+    if not cidrs:
+        return True
+    if not ip:
+        return False
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    for c in cidrs:
+        try:
+            if addr in ipaddress.ip_network(c, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 class Controller:
     """The single-driver token + latest move/look state. Not thread-safe; intended to
     run inside one uvicorn worker's event loop (mutations are synchronous).
 
-    With a :class:`DriveCode` ``presence`` gate, a claim requires the current projector
-    code and *preempts* whoever holds the token (latest present visitor wins), and
-    ``set_state`` no longer auto-claims — so a phone that lost control (or left the
-    venue) can't silently re-grab a free token by streaming. Without ``presence`` the
-    legacy first-come-wins behaviour is kept (for a display-less dev box)."""
+    Control is **newest-grab-wins**: a fresh ``request`` from a *present* phone preempts
+    whoever holds it, so a walk-up visitor always takes over instantly and a phone that
+    left the venue (or was pocketed) is overridden the moment someone present drives.
+    ``set_state`` never auto-claims — you must ``request`` first — so a preempted or
+    departed phone can't silently re-grab the token by streaming. Presence itself is
+    decided by the caller (by client IP, see :func:`client_is_present`) and passed in."""
 
-    def __init__(self, idle_timeout: float = 8.0, presence: Optional[DriveCode] = None):
+    def __init__(self, idle_timeout: float = 8.0):
         self.idle_timeout = idle_timeout
-        self.presence = presence
         self._driver: Optional[str] = None
         self._last_input: float = 0.0
         self._state: dict = _zero_state()
@@ -177,26 +152,19 @@ class Controller:
             self._driver = None
             self._state = _zero_state()
 
-    def request(self, client_id: str, now: float, code=None) -> bool:
-        """Claim control. With a presence gate, a valid ``code`` *preempts* the current
-        driver (latest present visitor wins); a bad/absent code is refused. Without a
-        gate: claim if free (or already held by this client), else False."""
+    def request(self, client_id: str, now: float, present: bool = True) -> bool:
+        """Take (or preempt) control — newest present phone wins. A non-present phone
+        (outside the venue, when presence gating is on) is refused."""
         self._expire(now)
-        if self.presence is not None:
-            if not self.presence.valid(code, now):
-                return False
-            if self._driver != client_id:
-                # Taking over from someone else: clear their held vector so the view
-                # doesn't keep drifting on the previous driver's last input.
-                self._state = _zero_state()
-            self._driver = client_id
-            self._last_input = now
-            return True
-        if self._driver is None:
-            self._driver = client_id
-            self._last_input = now
-            return True
-        return self._driver == client_id
+        if not present:
+            return False
+        if self._driver != client_id:
+            # Taking over from someone else: clear their held vector so the view doesn't
+            # keep drifting on the previous driver's last input.
+            self._state = _zero_state()
+        self._driver = client_id
+        self._last_input = now
+        return True
 
     def release(self, client_id: str) -> bool:
         """Give up control. False if this client wasn't the driver."""
@@ -207,13 +175,10 @@ class Controller:
         return False
 
     def set_state(self, client_id: str, state: dict, now: float) -> bool:
-        """Update move/look. Without a presence gate, auto-claims control when free.
-        With a gate, only the current driver may push (you must ``request`` a code
-        first) — this is what makes preemption stick. False if not the driver.
-        ``jump`` (an event) is not stored here."""
+        """Update move/look. Only the current driver may push (no auto-claim — you must
+        ``request`` first), so a preempted/left phone can't re-grab by streaming. False
+        if not the driver. ``jump`` (an event) is not stored here."""
         self._expire(now)
-        if self.presence is None and self._driver is None:
-            self._driver = client_id
         if self._driver != client_id:
             return False
         self._last_input = now

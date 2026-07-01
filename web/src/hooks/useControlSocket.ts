@@ -9,6 +9,8 @@ import { getWebSocketUrl } from "@/lib/api/baseUrl";
 export interface ControlSocket {
   connected: boolean;
   driving: boolean;
+  /** Server refused control because this phone isn't at the installation (presence gate). */
+  blockedRemote: boolean;
   send: (msg: object) => void;
 }
 
@@ -16,6 +18,7 @@ export function useControlSocket(): ControlSocket {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [driving, setDriving] = useState(false);
+  const [blockedRemote, setBlockedRemote] = useState(false);
 
   useEffect(() => {
     let closed = false;
@@ -36,7 +39,10 @@ export function useControlSocket(): ControlSocket {
       ws.onmessage = (e) => {
         try {
           const m = JSON.parse(e.data);
-          if (m.type === "status") setDriving(!!m.driving);
+          if (m.type === "status") {
+            setDriving(!!m.driving);
+            setBlockedRemote(m.reason === "remote");
+          }
         } catch {
           /* ignore */
         }
@@ -44,6 +50,7 @@ export function useControlSocket(): ControlSocket {
       ws.onclose = () => {
         setConnected(false);
         setDriving(false);
+        setBlockedRemote(false);
         wsRef.current = null;
         if (!closed) retry = setTimeout(connect, 1500);
       };
@@ -63,5 +70,5 @@ export function useControlSocket(): ControlSocket {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   }, []);
 
-  return { connected, driving, send };
+  return { connected, driving, blockedRemote, send };
 }
