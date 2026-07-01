@@ -431,6 +431,14 @@
   opacity: 0.18;
   pointer-events: none;
 }
+.memoryLabelGrabbed {
+  z-index: 10;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.28);
+  color: rgb(var(--ink));
+  text-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+  cursor: grabbing;
+}
 .exploreEmpty {
   position: absolute;
   top: 46%;
