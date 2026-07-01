@@ -61,37 +61,28 @@ def test_remote_phone_refused_when_gated(client, monkeypatch):
             assert ctl.receive_json() == {"type": "status", "driving": False, "reason": "remote"}
 
 
-def test_jump_is_broadcast(client):
+def test_jump_from_non_driver_is_broadcast(client):
+    # Explore's "tap a name to travel" sends a jump WITHOUT holding the driver token —
+    # a one-shot view command, not driving — so it must broadcast even when not driving.
     with client.websocket_connect("/ws/control?role=display") as disp:
         disp.receive_json()
         with client.websocket_connect("/ws/control?role=controller&clientId=a") as ctl:
-            ctl.send_json({"type": "request"})
-            ctl.receive_json()  # status
-            disp.receive_json()  # control on claim
             ctl.send_json({"type": "state", "move": {"x": 0, "y": 0}, "look": {"x": 0, "y": 0}, "jump": "random"})
-            ctl.receive_json()  # status
-            control_msg = disp.receive_json()
-            jump_msg = disp.receive_json()
-            assert control_msg["type"] == "control"
-            assert jump_msg == {"type": "jump", "target": "random"}
+            assert ctl.receive_json() == {"type": "status", "driving": False}  # not the driver
+            assert disp.receive_json() == {"type": "jump", "target": "random"}  # ...but jump still fires
 
 
-def test_filter_is_broadcast(client):
+def test_filter_from_non_driver_is_broadcast(client):
+    # The timeline filter is a shared-view command too — works without driving.
     with client.websocket_connect("/ws/control?role=display") as disp:
         disp.receive_json()
         with client.websocket_connect("/ws/control?role=controller&clientId=a") as ctl:
-            ctl.send_json({"type": "request"})
-            ctl.receive_json()  # status
-            disp.receive_json()  # control on claim
             ctl.send_json(
                 {"type": "state", "move": {"x": 0, "y": 0}, "look": {"x": 0, "y": 0},
                  "filter": {"from": 2012, "to": 2026}}
             )
-            ctl.receive_json()  # status
-            control_msg = disp.receive_json()
-            filter_msg = disp.receive_json()
-            assert control_msg["type"] == "control"
-            assert filter_msg == {"type": "filter", "from": 2012.0, "to": 2026.0}
+            assert ctl.receive_json() == {"type": "status", "driving": False}
+            assert disp.receive_json() == {"type": "filter", "from": 2012.0, "to": 2026.0}
 
 
 def test_release_zeroes_and_frees(client):

@@ -324,14 +324,22 @@ async def control_ws(ws: WebSocket):
                 await _broadcast_control()
             elif mtype == "state":
                 parsed = parse_control_state(msg)
+                present = _is_present(ws)
                 ok = _controller.set_state(client_id, parsed, now)
                 await ws.send_json({"type": "status", "driving": ok})
                 if ok:
                     await _broadcast_control()
-                    if "jump" in parsed:
-                        await _broadcast({"type": "jump", "target": parsed["jump"]})
+                    # recenter re-bases the *driver's* gyro aim, so it only makes sense
+                    # while actually driving.
                     if "recenter" in parsed:
                         await _broadcast({"type": "recenter"})
+                # jump (Explore's tap-to-travel) and filter (the timeline) are one-shot
+                # *view* commands, not continuous driving — they ride a `state` frame but
+                # don't need the driver token, only presence. Gating them on `ok` (the old
+                # auto-claim behaviour) broke Explore travel once auto-claim was removed.
+                if present:
+                    if "jump" in parsed:
+                        await _broadcast({"type": "jump", "target": parsed["jump"]})
                     if "filter" in parsed:
                         await _broadcast(
                             {"type": "filter", "from": parsed["filter"]["from"], "to": parsed["filter"]["to"]}
