@@ -65,7 +65,7 @@ export const FLY_TO_DURATION_MS = 1400;
 // Metres back from the memory origin along its heading when arriving (see
 // framePoseForRecord). Positive = stand on the photographer's side looking at it;
 // negative = arrive on the content side, looking back toward the origin.
-export const FLY_TO_STANDOFF = 5;
+export const FLY_TO_STANDOFF = 0.1;
 
 // The one chosen city. Origin is Wolfsburg city centre (Rathaus); geo placement
 // (S3) projects each memory's lat/lon to local metres relative to this point.
