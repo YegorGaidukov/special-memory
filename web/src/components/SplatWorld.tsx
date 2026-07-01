@@ -329,17 +329,16 @@ export default function SplatWorld() {
 }
 
 // A soft edge-darkening overlay. On a projector the image has a hard rectangular
-// cutoff; fading each edge straight into the void color melts that border into the
-// ambient so the picture reads as glowing out of darkness rather than a bright
-// rectangle. Four straight (linear) gradients — one per edge — stacked, each
-// fading from the void color at its edge to transparent inward (no radial falloff,
-// so corners are the natural overlap of two edges).
+// cutoff; darkening each edge into the void color melts that border into the ambient
+// so the picture reads as glowing out of darkness rather than a bright rectangle.
+// An inset box-shadow (void-colored) does this in one paint: a solid edge ring
+// (spread) that blurs smoothly inward, with corners falling off radially. Unlike
+// stacked linear-gradients it has no color-stop banding and no hard overlap seams
+// where edges meet. Sizes are vmin so the falloff scales with the projection.
 // pointerEvents:none so it never intercepts clicks/drags; sits above the canvas
 // but below the toolbar/HUD (those use higher z-index).
 function Vignette({ theme }: { theme: "dark" | "light" }) {
   const edge = theme === "dark" ? "5, 6, 10" : "238, 241, 246";
-  const band = (dir: string) =>
-    `linear-gradient(${dir}, rgba(${edge}, 1) 0%, rgba(${edge}, 0) 10%)`;
   return (
     <div
       aria-hidden
@@ -348,12 +347,7 @@ function Vignette({ theme }: { theme: "dark" | "light" }) {
         inset: 0,
         zIndex: 30,
         pointerEvents: "none",
-        background: [
-          band("to right"),
-          band("to left"),
-          band("to bottom"),
-          band("to top"),
-        ].join(", "),
+        boxShadow: `inset 0 0 14vmin 2vmin rgba(${edge}, 1)`,
       }}
     />
   );
